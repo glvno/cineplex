@@ -1,4 +1,4 @@
-# Cineplex - Iced Video Player
+# Cineplex
 
 The world's least worst video multiplexer, written in Rust.
 
