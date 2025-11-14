@@ -2,10 +2,7 @@
 
 The world's least worst video multiplexer, written in Rust.
 
-## Features
-
-
-## Quick Start
+https://github.com/user-attachments/assets/a5a763b0-5976-436a-89ff-9d1c2529e893
 
 ### Prerequisites
 
@@ -18,7 +15,7 @@ The world's least worst video multiplexer, written in Rust.
 cargo run --release
 ```
 
-## Known Issues
+### Known Issues
 
 Due to an upstream bug, certain H.264 videos fail to render in spectacular fashion.
 
