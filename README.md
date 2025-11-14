@@ -2,7 +2,8 @@
 
 The world's least worst video multiplexer, written in Rust.
 
-https://github.com/user-attachments/assets/a5a763b0-5976-436a-89ff-9d1c2529e893
+https://github.com/user-attachments/assets/41e884e9-8c23-474d-8b6a-930d4cc0c1ff
+
 
 ### Prerequisites
 
