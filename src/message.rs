@@ -19,7 +19,4 @@ pub enum Message {
     ClearCache,
     FileDropped(PathBuf),
     EventOccurred(Event),
-    ConversionStarted(PathBuf, usize),
-    ConversionComplete(PathBuf, PathBuf, usize), // original, converted, video_id
-    ConversionFailed(PathBuf, String, usize),
 }

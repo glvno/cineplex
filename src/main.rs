@@ -1,6 +1,5 @@
 mod app;
 mod cache;
-mod codec;
 mod loader;
 mod message;
 mod state;

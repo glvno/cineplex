@@ -11,9 +11,6 @@ use crate::ui;
 impl App {
     /// Handle UI messages and state updates.
     pub fn update(&mut self, message: Message) {
-        // Check for completed conversions first
-        loader::check_for_completed_conversions(self);
-
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()
@@ -31,7 +28,6 @@ impl App {
             }
             Message::ClearCache => {
                 self.status = cache::clear_cache();
-                self.conversion_cache.clear();
             }
             Message::FileDropped(path) => {
                 loader::load_video_from_path(self, path);
@@ -169,17 +165,6 @@ impl App {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
                     vid.hovered = hovered;
                 }
-            }
-            Message::ConversionStarted(path, _id) => {
-                eprintln!("Conversion started for: {:?}", path);
-            }
-            Message::ConversionComplete(_original, converted, _id) => {
-                eprintln!("Conversion complete: {:?}", converted);
-            }
-            Message::ConversionFailed(path, error, _id) => {
-                eprintln!("Conversion failed for {:?}: {}", path, error);
-                self.error = Some(format!("Conversion failed: {}", error));
-                self.converting.remove(&path);
             }
         }
     }
