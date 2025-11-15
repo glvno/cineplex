@@ -68,7 +68,9 @@ impl App {
             }
             Message::TogglePause(id) => {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
-                    vid.video.set_paused(!vid.video.paused());
+                    let was_paused = vid.video.paused();
+                    vid.video.set_paused(!was_paused);
+                    log::debug!("Video pause toggled: id={}, paused={}", id, !was_paused);
                 }
             }
             Message::ToggleLoop(id) => {
@@ -76,6 +78,7 @@ impl App {
                     let new_looping_state = !vid.video.looping();
                     vid.video.set_looping(new_looping_state);
                     vid.looping_enabled = new_looping_state;
+                    log::debug!("Video looping toggled: id={}, looping={}", id, new_looping_state);
                 }
             }
             Message::ToggleMute(id) => {
@@ -121,10 +124,13 @@ impl App {
                 // Only loop if the looping_enabled flag is set
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
                     if vid.looping_enabled {
+                        log::debug!("Video reached end of stream, looping: id={}", id);
                         // Seek back to start and continue playing
                         vid.position = 0.0;
                         let _ = vid.video.seek(Duration::ZERO, true);
                         vid.video.set_paused(false);
+                    } else {
+                        log::debug!("Video reached end of stream, not looping: id={}", id);
                     }
                 }
             }
@@ -159,7 +165,11 @@ impl App {
                 }
             }
             Message::RemoveVideo(id) => {
+                let before_count = self.videos.len();
                 self.videos.retain(|v| v.id != id);
+                if before_count != self.videos.len() {
+                    log::info!("Video removed: id={}, remaining_videos={}", id, self.videos.len());
+                }
             }
             Message::VideoHoverChanged(id, hovered) => {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {

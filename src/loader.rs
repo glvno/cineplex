@@ -26,8 +26,9 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                 video.set_looping(true);
                 let native_fps = video.framerate();
                 let now = Instant::now();
+                let video_id = app.next_id;
                 let video_instance = VideoInstance {
-                    id: app.next_id,
+                    id: video_id,
                     video,
                     path: video_path.clone(),
                     position: 0.0,
@@ -43,6 +44,8 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     last_ui_update: now,
                     pending_position_update: false,
                 };
+                log::info!("Video loaded: id={}, path={}, fps={}, total_videos={}",
+                          video_id, video_path.display(), native_fps, app.videos.len() + 1);
                 app.videos.push(video_instance);
                 app.next_id += 1;
                 app.error = None;
