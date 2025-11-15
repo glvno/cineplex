@@ -2005,7 +2005,7 @@ dependencies = [
 [[package]]
 name = "iced_video_player"
 version = "0.6.0"
-source = "git+https://github.com/glvno/iced_video_player.git?branch=master#7048447f27c6ae6a37a8e397b34af0e75c624d81"
+source = "git+https://github.com/glvno/iced_video_player.git?branch=master#8e500abe1b2bae7276f1b620e4a6f8120c4c4529"
 dependencies = [
  "glib",
  "gstreamer",
@@ -4734,7 +4734,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]

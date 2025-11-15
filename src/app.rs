@@ -106,7 +106,9 @@ impl App {
                     // Validate secs is a valid number
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
-                        synchronized_set_paused(&mut vid.video, true);
+                        // NOTE: Do NOT pause here - calling set_paused triggers audio sink state changes
+                        // that try to acquire CoreAudio HALB_Mutex, causing deadlock with other threads.
+                        // Let video continue playing while user scrubs.
                         vid.position = secs;
                     }
                 }
@@ -119,7 +121,8 @@ impl App {
                         // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
                         let _ = synchronized_seek(&mut vid.video, Duration::from_secs_f64(vid.position), false);
                     }
-                    synchronized_set_paused(&mut vid.video, false);
+                    // NOTE: Do NOT resume here - calling set_paused triggers audio sink state changes
+                    // that deadlock. Just let the seek complete naturally.
                 }
             }
             Message::EndOfStream(id) => {
