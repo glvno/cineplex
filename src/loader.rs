@@ -1,19 +1,9 @@
 use iced_video_player::Video;
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::state::{App, VideoInstance};
-
-// Global lock to prevent simultaneous GStreamer pipeline initialization
-// which causes FLUSH_START event deadlocks when loading multiple videos
-static GSTREAMER_INIT_LOCK: std::sync::OnceLock<Arc<Mutex<()>>> = std::sync::OnceLock::new();
-
-fn get_gstreamer_lock() -> Arc<Mutex<()>> {
-    GSTREAMER_INIT_LOCK
-        .get_or_init(|| Arc::new(Mutex::new(())))
-        .clone()
-}
+use crate::sync::synchronized_set_paused;
 
 /// Load a video from a file path.
 pub fn load_video_from_path(app: &mut App, video_path: PathBuf) {
@@ -21,9 +11,6 @@ pub fn load_video_from_path(app: &mut App, video_path: PathBuf) {
 
     match std::fs::metadata(&video_path) {
         Ok(_) => {
-            // Acquire lock to prevent simultaneous GStreamer pipeline initialization
-            let lock = get_gstreamer_lock();
-            let _guard = lock.lock().unwrap();
             load_direct_video(app, &video_path);
         }
         Err(e) => {
@@ -41,6 +28,13 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                 let native_fps = video.framerate();
                 let now = Instant::now();
                 let video_id = app.next_id;
+
+                // Auto-play the video with synchronization to prevent deadlocks
+                // Videos start in Paused state, so we transition to Playing here
+                // The serialization ensures only one video enters Playing state at a time
+                log::debug!("Auto-playing video on load: id={}", video_id);
+                synchronized_set_paused(&mut video, false);
+
                 let video_instance = VideoInstance {
                     id: video_id,
                     video,
@@ -57,6 +51,8 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     native_fps,
                     last_ui_update: now,
                     pending_position_update: false,
+                    should_auto_play: false,
+                    loaded_at: now,
                 };
                 log::info!("Video loaded: id={}, path={}, fps={}, total_videos={}",
                           video_id, video_path.display(), native_fps, app.videos.len() + 1);

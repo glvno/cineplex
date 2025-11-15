@@ -6,6 +6,7 @@ use crate::cache;
 use crate::loader;
 use crate::message::Message;
 use crate::state::App;
+use crate::sync::{synchronized_seek, synchronized_set_paused};
 use crate::ui;
 
 impl App {
@@ -69,7 +70,7 @@ impl App {
             Message::TogglePause(id) => {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
                     let was_paused = vid.video.paused();
-                    vid.video.set_paused(!was_paused);
+                    synchronized_set_paused(&mut vid.video, !was_paused);
                     log::debug!("Video pause toggled: id={}, paused={}", id, !was_paused);
                 }
             }
@@ -105,7 +106,7 @@ impl App {
                     // Validate secs is a valid number
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
-                        vid.video.set_paused(true);
+                        synchronized_set_paused(&mut vid.video, true);
                         vid.position = secs;
                     }
                 }
@@ -115,10 +116,10 @@ impl App {
                     vid.dragging = false;
                     // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
                     if vid.position.is_finite() && vid.position >= 0.0 {
-                        // Use inaccurate seek (false) to avoid GStreamer mutex deadlocks
-                        let _ = vid.video.seek(Duration::from_secs_f64(vid.position), false);
+                        // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
+                        let _ = synchronized_seek(&mut vid.video, Duration::from_secs_f64(vid.position), false);
                     }
-                    vid.video.set_paused(false);
+                    synchronized_set_paused(&mut vid.video, false);
                 }
             }
             Message::EndOfStream(id) => {
@@ -128,10 +129,10 @@ impl App {
                         log::debug!("Video reached end of stream, looping: id={}", id);
                         // Seek back to start and continue playing
                         vid.position = 0.0;
-                        // Use inaccurate seek (false) instead of accurate seek (true) to avoid deadlocks
-                        // Accurate seeks can cause GStreamer mutex deadlocks when processing FLUSH_START events
-                        let _ = vid.video.seek(Duration::ZERO, false);
-                        vid.video.set_paused(false);
+                        // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
+                        // When multiple videos loop simultaneously, concurrent seeks can cause GStreamer mutex deadlock
+                        let _ = synchronized_seek(&mut vid.video, Duration::ZERO, false);
+                        synchronized_set_paused(&mut vid.video, false);
                     } else {
                         log::debug!("Video reached end of stream, not looping: id={}", id);
                     }

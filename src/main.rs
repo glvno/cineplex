@@ -3,6 +3,7 @@ mod cache;
 mod loader;
 mod message;
 mod state;
+mod sync;
 mod ui;
 
 use state::App;
