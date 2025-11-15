@@ -115,7 +115,8 @@ impl App {
                     vid.dragging = false;
                     // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
                     if vid.position.is_finite() && vid.position >= 0.0 {
-                        let _ = vid.video.seek(Duration::from_secs_f64(vid.position), true);
+                        // Use inaccurate seek (false) to avoid GStreamer mutex deadlocks
+                        let _ = vid.video.seek(Duration::from_secs_f64(vid.position), false);
                     }
                     vid.video.set_paused(false);
                 }
@@ -127,7 +128,9 @@ impl App {
                         log::debug!("Video reached end of stream, looping: id={}", id);
                         // Seek back to start and continue playing
                         vid.position = 0.0;
-                        let _ = vid.video.seek(Duration::ZERO, true);
+                        // Use inaccurate seek (false) instead of accurate seek (true) to avoid deadlocks
+                        // Accurate seeks can cause GStreamer mutex deadlocks when processing FLUSH_START events
+                        let _ = vid.video.seek(Duration::ZERO, false);
                         vid.video.set_paused(false);
                     } else {
                         log::debug!("Video reached end of stream, not looping: id={}", id);
