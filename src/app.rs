@@ -123,19 +123,10 @@ impl App {
                 }
             }
             Message::EndOfStream(id) => {
-                // Only loop if the looping_enabled flag is set
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
-                    if vid.looping_enabled {
-                        log::debug!("Video reached end of stream, looping: id={}", id);
-                        // Seek back to start - video should remain in Playing state
-                        vid.position = 0.0;
-                        // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
-                        // When multiple videos loop simultaneously, concurrent seeks can cause GStreamer mutex deadlock
-                        // Note: We don't call set_paused(false) after seek - the video should remain playing
-                        let _ = synchronized_seek(&mut vid.video, Duration::ZERO, false);
-                    } else {
-                        log::debug!("Video reached end of stream, not looping: id={}", id);
-                    }
+                // GStreamer handles looping internally via video.set_looping(true)
+                // We just log it for diagnostics. Don't trigger seek here - let GStreamer loop naturally.
+                if let Some(_vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                    log::debug!("Video reached end of stream (GStreamer looping handles restart): id={}", id);
                 }
             }
             Message::NewFrame(id) => {
@@ -149,12 +140,15 @@ impl App {
                         vid.last_fps_time = std::time::Instant::now();
                     }
 
+                    // NOTE: Calling video.position() causes a deadlock due to GStreamer's CoreAudio
+                    // latency query trying to acquire a mutex from the main thread. This appears to be
+                    // a fundamental issue with GStreamer's OSX audio sink and CoreAudio interaction.
+                    // Disabling position updates to prevent deadlocks. Videos still loop correctly
+                    // via GStreamer's internal looping mechanism (video.set_looping(true)).
+                    // Position remains at 0.0 in the UI, but the core functionality works reliably.
                     if !vid.dragging {
-                        let pos = vid.video.position().as_secs_f64();
-                        // Only update position if it's a valid number
-                        if pos.is_finite() && pos >= 0.0 {
-                            vid.position = pos;
-                        }
+                        // DO NOT QUERY POSITION - causes deadlock with CoreAudio
+                        // vid.position remains 0.0 to avoid UI updates that trigger GStreamer queries
                     }
 
                     // Throttle UI updates to 30 FPS max (~33ms between redraws)
