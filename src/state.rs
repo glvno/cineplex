@@ -1,5 +1,4 @@
 use iced_video_player::Video;
-use std::path::PathBuf;
 use std::time::Instant;
 use tempfile::TempDir;
 
@@ -7,7 +6,6 @@ use tempfile::TempDir;
 pub struct VideoInstance {
     pub id: usize,
     pub video: Video,
-    pub path: PathBuf,
     pub position: f64,
     pub dragging: bool,
     pub hovered: bool,
@@ -22,11 +20,6 @@ pub struct VideoInstance {
     // Frame throttling for UI updates (max 30 FPS UI refreshes)
     pub last_ui_update: Instant,
     pub pending_position_update: bool,
-    // Auto-play flag: start playing after first frame is available
-    // This allows the pipeline to stabilize before transitioning to Playing state
-    pub should_auto_play: bool,
-    // Timestamp when video was loaded - used to delay auto-play slightly
-    pub loaded_at: Instant,
 }
 
 /// Application state containing all videos and UI state.

@@ -9,27 +9,9 @@ use crate::state::App;
 use crate::sync::{synchronized_seek, synchronized_set_paused};
 use crate::ui;
 
-/// Check and apply auto-play for videos that have stabilized
-fn check_auto_play_videos(videos: &mut Vec<crate::state::VideoInstance>) {
-    for vid in videos.iter_mut() {
-        // Auto-play videos after 500ms of being loaded
-        // This gives the pipeline time to fully stabilize before transitioning to Playing
-        if vid.should_auto_play && vid.loaded_at.elapsed().as_millis() >= 500 {
-            if vid.video.paused() {
-                log::debug!("Auto-playing video after 500ms stabilization: id={}", vid.id);
-                synchronized_set_paused(&mut vid.video, false);
-            }
-            vid.should_auto_play = false;
-        }
-    }
-}
-
 impl App {
     /// Handle UI messages and state updates.
     pub fn update(&mut self, message: Message) {
-        // Check for any videos that need auto-play before processing messages
-        // This ensures auto-play happens safely between message processing
-        check_auto_play_videos(&mut self.videos);
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()
@@ -145,12 +127,12 @@ impl App {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
                     if vid.looping_enabled {
                         log::debug!("Video reached end of stream, looping: id={}", id);
-                        // Seek back to start and continue playing
+                        // Seek back to start - video should remain in Playing state
                         vid.position = 0.0;
                         // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
                         // When multiple videos loop simultaneously, concurrent seeks can cause GStreamer mutex deadlock
+                        // Note: We don't call set_paused(false) after seek - the video should remain playing
                         let _ = synchronized_seek(&mut vid.video, Duration::ZERO, false);
-                        synchronized_set_paused(&mut vid.video, false);
                     } else {
                         log::debug!("Video reached end of stream, not looping: id={}", id);
                     }

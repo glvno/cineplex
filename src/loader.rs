@@ -31,7 +31,6 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                 let video_instance = VideoInstance {
                     id: video_id,
                     video,
-                    path: video_path.clone(),
                     position: 0.0,
                     dragging: false,
                     hovered: false,
@@ -44,8 +43,6 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     native_fps,
                     last_ui_update: now,
                     pending_position_update: false,
-                    should_auto_play: true,
-                    loaded_at: now,
                 };
                 log::info!("Video loaded: id={}, path={}, fps={}, total_videos={}",
                           video_id, video_path.display(), native_fps, app.videos.len() + 1);
