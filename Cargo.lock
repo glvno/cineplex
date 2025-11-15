@@ -2005,7 +2005,7 @@ dependencies = [
 [[package]]
 name = "iced_video_player"
 version = "0.6.0"
-source = "git+https://github.com/glvno/iced_video_player.git?branch=master#8e500abe1b2bae7276f1b620e4a6f8120c4c4529"
+source = "git+https://github.com/glvno/iced_video_player.git?branch=master#c31f0ac7b8997bd00fd2a797fcb7d4da6c0aeb91"
 dependencies = [
  "glib",
  "gstreamer",
