@@ -1,8 +1,19 @@
 use iced_video_player::Video;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
 use crate::state::{App, VideoInstance};
+
+// Global lock to prevent simultaneous GStreamer pipeline initialization
+// which causes FLUSH_START event deadlocks when loading multiple videos
+static GSTREAMER_INIT_LOCK: std::sync::OnceLock<Arc<Mutex<()>>> = std::sync::OnceLock::new();
+
+fn get_gstreamer_lock() -> Arc<Mutex<()>> {
+    GSTREAMER_INIT_LOCK
+        .get_or_init(|| Arc::new(Mutex::new(())))
+        .clone()
+}
 
 /// Load a video from a file path.
 pub fn load_video_from_path(app: &mut App, video_path: PathBuf) {
@@ -10,6 +21,9 @@ pub fn load_video_from_path(app: &mut App, video_path: PathBuf) {
 
     match std::fs::metadata(&video_path) {
         Ok(_) => {
+            // Acquire lock to prevent simultaneous GStreamer pipeline initialization
+            let lock = get_gstreamer_lock();
+            let _guard = lock.lock().unwrap();
             load_direct_video(app, &video_path);
         }
         Err(e) => {
