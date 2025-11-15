@@ -9,9 +9,27 @@ use crate::state::App;
 use crate::sync::{synchronized_seek, synchronized_set_paused};
 use crate::ui;
 
+/// Check and apply auto-play for videos that have stabilized
+fn check_auto_play_videos(videos: &mut Vec<crate::state::VideoInstance>) {
+    for vid in videos.iter_mut() {
+        // Auto-play videos after 500ms of being loaded
+        // This gives the pipeline time to fully stabilize before transitioning to Playing
+        if vid.should_auto_play && vid.loaded_at.elapsed().as_millis() >= 500 {
+            if vid.video.paused() {
+                log::debug!("Auto-playing video after 500ms stabilization: id={}", vid.id);
+                synchronized_set_paused(&mut vid.video, false);
+            }
+            vid.should_auto_play = false;
+        }
+    }
+}
+
 impl App {
     /// Handle UI messages and state updates.
     pub fn update(&mut self, message: Message) {
+        // Check for any videos that need auto-play before processing messages
+        // This ensures auto-play happens safely between message processing
+        check_auto_play_videos(&mut self.videos);
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()

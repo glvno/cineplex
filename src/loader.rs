@@ -3,7 +3,6 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 use crate::state::{App, VideoInstance};
-use crate::sync::synchronized_set_paused;
 
 /// Load a video from a file path.
 pub fn load_video_from_path(app: &mut App, video_path: PathBuf) {
@@ -29,12 +28,6 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                 let now = Instant::now();
                 let video_id = app.next_id;
 
-                // Auto-play the video with synchronization to prevent deadlocks
-                // Videos start in Paused state, so we transition to Playing here
-                // The serialization ensures only one video enters Playing state at a time
-                log::debug!("Auto-playing video on load: id={}", video_id);
-                synchronized_set_paused(&mut video, false);
-
                 let video_instance = VideoInstance {
                     id: video_id,
                     video,
@@ -51,7 +44,7 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     native_fps,
                     last_ui_update: now,
                     pending_position_update: false,
-                    should_auto_play: false,
+                    should_auto_play: true,
                     loaded_at: now,
                 };
                 log::info!("Video loaded: id={}, path={}, fps={}, total_videos={}",
