@@ -20,9 +20,6 @@ pub struct VideoInstance {
     // Frame throttling for UI updates (max 30 FPS UI refreshes)
     pub last_ui_update: Instant,
     pub pending_position_update: bool,
-    // Cached position to avoid expensive position queries on every frame
-    pub cached_position: f64,
-    pub last_position_query: Instant,
 }
 
 /// Application state containing all videos and UI state.

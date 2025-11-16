@@ -2,6 +2,7 @@ use std::path::PathBuf;
 use iced::Event;
 
 #[derive(Clone, Debug)]
+#[allow(dead_code)]
 pub enum Message {
     TogglePause(usize),
     ToggleLoop(usize),

@@ -43,8 +43,6 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     native_fps,
                     last_ui_update: now,
                     pending_position_update: false,
-                    cached_position: 0.0,
-                    last_position_query: now,
                 };
                 log::info!("Video loaded: id={}, path={}, fps={}, total_videos={}",
                           video_id, video_path.display(), native_fps, app.videos.len() + 1);
