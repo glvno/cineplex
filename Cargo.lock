@@ -590,7 +590,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "cineplex"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "env_logger",
  "iced",
@@ -2005,7 +2005,7 @@ dependencies = [
 [[package]]
 name = "iced_video_player"
 version = "0.6.0"
-source = "git+https://github.com/glvno/iced_video_player.git?branch=master#100ea73c943288e089453ed90980f4f9c30ecb8a"
+source = "git+https://github.com/glvno/iced_video_player.git?branch=master#4e4e4dc47772c164ae67aa9d89f5f7bb8d6720de"
 dependencies = [
  "glib",
  "gstreamer",

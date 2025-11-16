@@ -82,19 +82,9 @@ impl App {
                     log::debug!("Video looping toggled: id={}, looping={}", id, new_looping_state);
                 }
             }
-            Message::ToggleMute(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
-                    let current_muted = vid.video.muted();
-                    if current_muted {
-                        // Unmute: restore volume to 1.0 and unmute
-                        vid.video.set_volume(1.0);
-                        vid.video.set_muted(false);
-                    } else {
-                        // Mute: set volume to 0 and mute
-                        vid.video.set_volume(0.0);
-                        vid.video.set_muted(true);
-                    }
-                }
+            Message::ToggleMute(_id) => {
+                // Mute toggle is a no-op - audio control is handled by the underlying iced_video_player
+                // Attempting to control audio via set_muted() or set_volume() causes GStreamer deadlocks
             }
             Message::ToggleFullscreen(id) => {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
