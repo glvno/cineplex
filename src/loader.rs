@@ -23,6 +23,8 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
     match url::Url::from_file_path(&video_path) {
         Ok(url) => match Video::new(&url) {
             Ok(mut video) => {
+                video.set_muted(true);
+                video.set_volume(0.0);
                 video.set_looping(true);
                 let native_fps = video.framerate();
                 let now = Instant::now();
@@ -44,8 +46,13 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     last_ui_update: now,
                     pending_position_update: false,
                 };
-                log::info!("Video loaded: id={}, path={}, fps={}, total_videos={}",
-                          video_id, video_path.display(), native_fps, app.videos.len() + 1);
+                log::info!(
+                    "Video loaded: id={}, path={}, fps={}, total_videos={}",
+                    video_id,
+                    video_path.display(),
+                    native_fps,
+                    app.videos.len() + 1
+                );
                 app.videos.push(video_instance);
                 app.next_id += 1;
                 app.error = None;

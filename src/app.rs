@@ -79,12 +79,26 @@ impl App {
                     let new_looping_state = !vid.video.looping();
                     vid.video.set_looping(new_looping_state);
                     vid.looping_enabled = new_looping_state;
-                    log::debug!("Video looping toggled: id={}, looping={}", id, new_looping_state);
+                    log::debug!(
+                        "Video looping toggled: id={}, looping={}",
+                        id,
+                        new_looping_state
+                    );
                 }
             }
-            Message::ToggleMute(_id) => {
-                // Mute toggle is a no-op - audio control is handled by the underlying iced_video_player
-                // Attempting to control audio via set_muted() or set_volume() causes GStreamer deadlocks
+            Message::ToggleMute(id) => {
+                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                    let current_muted = vid.video.muted();
+                    if current_muted {
+                        // Unmute: restore volume to 1.0 and unmute
+                        vid.video.set_volume(1.0);
+                        vid.video.set_muted(false);
+                    } else {
+                        // Mute: set volume to 0 and mute
+                        vid.video.set_volume(0.0);
+                        vid.video.set_muted(true);
+                    }
+                }
             }
             Message::ToggleFullscreen(id) => {
                 if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
@@ -109,7 +123,11 @@ impl App {
                     // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
                     if vid.position.is_finite() && vid.position >= 0.0 {
                         // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
-                        let _ = synchronized_seek(&mut vid.video, Duration::from_secs_f64(vid.position), false);
+                        let _ = synchronized_seek(
+                            &mut vid.video,
+                            Duration::from_secs_f64(vid.position),
+                            false,
+                        );
                     }
                     // NOTE: Do NOT resume here - calling set_paused triggers audio sink state changes
                     // that deadlock. Just let the seek complete naturally.
@@ -119,7 +137,10 @@ impl App {
                 // GStreamer handles looping internally via video.set_looping(true)
                 // We just log it for diagnostics. Don't trigger seek here - let GStreamer loop naturally.
                 if let Some(_vid) = self.videos.iter_mut().find(|v| v.id == id) {
-                    log::debug!("Video reached end of stream (GStreamer looping handles restart): id={}", id);
+                    log::debug!(
+                        "Video reached end of stream (GStreamer looping handles restart): id={}",
+                        id
+                    );
                 }
             }
             Message::NewFrame(id) => {
@@ -159,7 +180,11 @@ impl App {
                 let before_count = self.videos.len();
                 self.videos.retain(|v| v.id != id);
                 if before_count != self.videos.len() {
-                    log::info!("Video removed: id={}, remaining_videos={}", id, self.videos.len());
+                    log::info!(
+                        "Video removed: id={}, remaining_videos={}",
+                        id,
+                        self.videos.len()
+                    );
                 }
             }
             Message::VideoHoverChanged(id, hovered) => {
