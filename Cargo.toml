@@ -5,7 +5,7 @@ edition = "2024"
 
 [dependencies]
 iced = "0.13.1"
-iced_video_player = { git = "https://github.com/glvno/iced_video_player.git", branch = "revert" }
+iced_video_player = { git = "https://github.com/jazzfool/iced_video_player.git", branch = "master" }
 url = "2.5.7"
 tokio = { version = "1", features = ["rt", "process"] }
 tempfile = "3"
