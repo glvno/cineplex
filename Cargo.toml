@@ -17,3 +17,6 @@ env_logger = "0.11"
 libheif-rs = { version = "2", features = ["image"] }
 gstreamer = "0.23"
 gstreamer-app = "0.23"
+
+[profile.release]
+debug = true

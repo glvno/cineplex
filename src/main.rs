@@ -37,12 +37,19 @@ fn main() -> iced::Result {
 /// Collect media files from command-line arguments.
 /// If a directory is provided, returns all supported media files in that directory.
 /// If individual files are provided, returns those files.
+/// All paths are canonicalized to absolute paths.
 fn collect_initial_files() -> Vec<PathBuf> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let mut files = Vec::new();
 
     for arg in args {
         let path = PathBuf::from(&arg);
+        // Canonicalize to handle relative paths
+        let path = match path.canonicalize() {
+            Ok(p) => p,
+            Err(_) => continue, // Skip invalid paths
+        };
+
         if path.is_dir() {
             // Read directory and collect supported media files
             if let Ok(entries) = std::fs::read_dir(&path) {
