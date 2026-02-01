@@ -32,6 +32,11 @@ fn is_image_file(path: &PathBuf) -> bool {
         .unwrap_or(false)
 }
 
+/// Check if a path is a supported media file (video or image).
+pub fn is_supported_media_file(path: &PathBuf) -> bool {
+    is_video_file(path) || is_image_file(path)
+}
+
 /// Load a media file (video or photo) from a file path.
 pub fn load_media_from_path(app: &mut App, path: PathBuf) {
     app.status = "Loading...".to_string();

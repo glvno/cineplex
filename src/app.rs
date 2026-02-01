@@ -207,6 +207,11 @@ impl App {
                     }
                 }
             }
+            Message::LoadInitialFiles(paths) => {
+                for path in paths {
+                    loader::load_media_from_path(self, path);
+                }
+            }
         }
     }
 

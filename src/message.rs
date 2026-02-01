@@ -24,4 +24,5 @@ pub enum Message {
     ClearCache,
     FileDropped(PathBuf),
     EventOccurred(Event),
+    LoadInitialFiles(Vec<PathBuf>),
 }
