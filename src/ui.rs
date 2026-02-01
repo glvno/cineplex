@@ -104,36 +104,48 @@ pub fn create_photo_cell<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Element
 
 /// Build the overlay controls for a photo.
 fn build_photo_overlay<'a>(photo: &'a PhotoInstance) -> Element<'a, Message> {
-    let overlay = container(
-        column![
-            // Top bar with filename and close button
-            row![
-                text(&photo.filename).size(14).color(Color::WHITE),
-                container("").width(Length::Fill),
-                button(text("X").size(20))
-                    .on_press(Message::RemoveMedia(photo.id))
-                    .padding(5)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink)
-            ]
-            .padding(10),
-            // Center spacer
-            container("").height(Length::Fill),
-            // Bottom controls (just fullscreen for photos)
-            row![button(text(if photo.fullscreen { "V" } else { "F" }).size(12))
-                .on_press(Message::ToggleFullscreen(photo.id))
-                .padding(8)
+    let top_bar = container(
+        row![
+            text(&photo.filename).size(14).color(Color::WHITE),
+            container("").width(Length::Fill),
+            button(text("X").size(20))
+                .on_press(Message::RemoveMedia(photo.id))
+                .padding(5)
                 .width(Length::Shrink)
-                .height(Length::Shrink),]
-            .spacing(5)
-            .align_y(alignment::Vertical::Center)
-            .padding(10)
-        ],
+                .height(Length::Shrink)
+        ]
+        .padding(10),
     )
     .style(|_theme: &Theme| container::Style {
         background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
         ..Default::default()
     })
+    .width(Length::Fill);
+
+    let bottom_bar = container(
+        row![button(text(if photo.fullscreen { "V" } else { "F" }).size(12))
+            .on_press(Message::ToggleFullscreen(photo.id))
+            .padding(8)
+            .width(Length::Shrink)
+            .height(Length::Shrink),]
+        .spacing(5)
+        .align_y(alignment::Vertical::Center)
+        .padding(10),
+    )
+    .style(|_theme: &Theme| container::Style {
+        background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
+        ..Default::default()
+    })
+    .width(Length::Fill);
+
+    let overlay = container(
+        column![
+            top_bar,
+            // Center spacer (transparent)
+            container("").height(Length::Fill),
+            bottom_bar
+        ],
+    )
     .width(Length::Fill)
     .height(Length::Fill);
 
@@ -142,77 +154,89 @@ fn build_photo_overlay<'a>(photo: &'a PhotoInstance) -> Element<'a, Message> {
 
 /// Build the overlay controls for a video.
 fn build_video_overlay<'a>(vid: &'a VideoInstance) -> Element<'a, Message> {
-    let overlay = container(
-        column![
-            // Top bar with FPS and close button
-            row![
-                {
-                    let fps_text = get_fps_display(vid.current_fps);
-                    let fps_color = get_fps_color(vid.current_fps, vid.native_fps);
-                    text(fps_text)
-                        .size(14)
-                        .shaping(Shaping::Basic)
-                        .color(fps_color)
-                },
-                container("").width(Length::Fill),
-                button(text("X").size(20))
-                    .on_press(Message::RemoveMedia(vid.id))
-                    .padding(5)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink)
-            ]
-            .padding(10),
-            // Center spacer
-            container("").height(Length::Fill),
-            // Bottom controls
-            column![
-                // Seek slider
-                slider(0.0..=safe_duration(&vid.video), vid.position, move |pos| {
-                    Message::Seek(vid.id, pos)
-                })
-                .step(0.1)
-                .on_release(Message::SeekRelease(vid.id)),
-                // Control buttons
-                row![
-                    button(text(if vid.video.paused() { ">" } else { "||" }).size(12))
-                        .on_press(Message::TogglePause(vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
-                    button(text(if vid.video.looping() { "↻" } else { "→" }).size(12))
-                        .on_press(Message::ToggleLoop(vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
-                    button(text(if vid.video.muted() { "M" } else { "~" }).size(12))
-                        .on_press(Message::ToggleMute(vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
-                    button(text(if vid.fullscreen { "V" } else { "F" }).size(12))
-                        .on_press(Message::ToggleFullscreen(vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
-                    text(format!(
-                        "{}:{:02}",
-                        vid.position as u64 / 60,
-                        vid.position as u64 % 60
-                    ))
-                    .size(12)
-                ]
-                .spacing(5)
-                .align_y(alignment::Vertical::Center)
+    let top_bar = container(
+        row![
+            {
+                let fps_text = get_fps_display(vid.current_fps);
+                let fps_color = get_fps_color(vid.current_fps, vid.native_fps);
+                text(fps_text)
+                    .size(14)
+                    .shaping(Shaping::Basic)
+                    .color(fps_color)
+            },
+            container("").width(Length::Fill),
+            button(text("X").size(20))
+                .on_press(Message::RemoveMedia(vid.id))
+                .padding(5)
                 .width(Length::Shrink)
-            ]
-            .spacing(5)
-            .padding(10)
+                .height(Length::Shrink)
         ]
+        .padding(10),
     )
     .style(|_theme: &Theme| container::Style {
         background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
         ..Default::default()
     })
+    .width(Length::Fill);
+
+    let bottom_bar = container(
+        column![
+            // Seek slider
+            slider(0.0..=safe_duration(&vid.video), vid.position, move |pos| {
+                Message::Seek(vid.id, pos)
+            })
+            .step(0.1)
+            .on_release(Message::SeekRelease(vid.id)),
+            // Control buttons
+            row![
+                button(text(if vid.video.paused() { ">" } else { "||" }).size(12))
+                    .on_press(Message::TogglePause(vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+                button(text(if vid.video.looping() { "↻" } else { "→" }).size(12))
+                    .on_press(Message::ToggleLoop(vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+                button(text(if vid.video.muted() { "M" } else { "~" }).size(12))
+                    .on_press(Message::ToggleMute(vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+                button(text(if vid.fullscreen { "V" } else { "F" }).size(12))
+                    .on_press(Message::ToggleFullscreen(vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+                text(format!(
+                    "{}:{:02}",
+                    vid.position as u64 / 60,
+                    vid.position as u64 % 60
+                ))
+                .size(12)
+            ]
+            .spacing(5)
+            .align_y(alignment::Vertical::Center)
+            .width(Length::Shrink)
+        ]
+        .spacing(5)
+        .padding(10),
+    )
+    .style(|_theme: &Theme| container::Style {
+        background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
+        ..Default::default()
+    })
+    .width(Length::Fill);
+
+    let overlay = container(
+        column![
+            top_bar,
+            // Center spacer (transparent)
+            container("").height(Length::Fill),
+            bottom_bar
+        ],
+    )
     .width(Length::Fill)
     .height(Length::Fill);
 
@@ -320,94 +344,106 @@ fn render_fullscreen_video<'a>(
     .center_x(Length::Fill)
     .center_y(Length::Fill);
 
-    let overlay = container(
-        column![
-            // Top bar with FPS and close button
-            row![
-                {
-                    let fps_text = get_fps_display(fullscreen_vid.current_fps);
-                    let fps_color =
-                        get_fps_color(fullscreen_vid.current_fps, fullscreen_vid.native_fps);
-                    text(fps_text)
-                        .size(14)
-                        .shaping(Shaping::Basic)
-                        .color(fps_color)
-                },
-                container("").width(Length::Fill),
-                button(text("X").size(20))
-                    .on_press(Message::ToggleFullscreen(fullscreen_vid.id))
-                    .padding(5)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink)
-            ]
-            .padding(10),
-            // Center spacer
-            container("").height(Length::Fill),
-            // Bottom controls
-            column![
-                // Seek slider
-                slider(
-                    0.0..=safe_duration(&fullscreen_vid.video),
-                    fullscreen_vid.position,
-                    move |pos| Message::Seek(fullscreen_vid.id, pos)
-                )
-                .step(0.1)
-                .on_release(Message::SeekRelease(fullscreen_vid.id)),
-                // Control buttons
-                row![
-                    button(
-                        text(if fullscreen_vid.video.paused() {
-                            ">"
-                        } else {
-                            "||"
-                        })
-                        .size(12)
-                    )
-                    .on_press(Message::TogglePause(fullscreen_vid.id))
-                    .padding(8)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink),
-                    button(
-                        text(if fullscreen_vid.video.looping() {
-                            "↻"
-                        } else {
-                            "→"
-                        })
-                        .size(12)
-                    )
-                    .on_press(Message::ToggleLoop(fullscreen_vid.id))
-                    .padding(8)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink),
-                    button(text(if fullscreen_vid.video.muted() { "M" } else { "~" }).size(12))
-                        .on_press(Message::ToggleMute(fullscreen_vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
-                    button(text("V").size(12))
-                        .on_press(Message::ToggleFullscreen(fullscreen_vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
-                    text(format!(
-                        "{}:{:02}",
-                        fullscreen_vid.position as u64 / 60,
-                        fullscreen_vid.position as u64 % 60
-                    ))
-                    .size(12)
-                ]
-                .spacing(5)
-                .align_y(alignment::Vertical::Center)
+    let top_bar = container(
+        row![
+            {
+                let fps_text = get_fps_display(fullscreen_vid.current_fps);
+                let fps_color =
+                    get_fps_color(fullscreen_vid.current_fps, fullscreen_vid.native_fps);
+                text(fps_text)
+                    .size(14)
+                    .shaping(Shaping::Basic)
+                    .color(fps_color)
+            },
+            container("").width(Length::Fill),
+            button(text("X").size(20))
+                .on_press(Message::ToggleFullscreen(fullscreen_vid.id))
+                .padding(5)
                 .width(Length::Shrink)
-            ]
-            .spacing(5)
-            .padding(10)
-        ],
+                .height(Length::Shrink)
+        ]
+        .padding(10),
     )
     .style(|_theme: &Theme| container::Style {
         background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
         ..Default::default()
     })
+    .width(Length::Fill);
+
+    let bottom_bar = container(
+        column![
+            // Seek slider
+            slider(
+                0.0..=safe_duration(&fullscreen_vid.video),
+                fullscreen_vid.position,
+                move |pos| Message::Seek(fullscreen_vid.id, pos)
+            )
+            .step(0.1)
+            .on_release(Message::SeekRelease(fullscreen_vid.id)),
+            // Control buttons
+            row![
+                button(
+                    text(if fullscreen_vid.video.paused() {
+                        ">"
+                    } else {
+                        "||"
+                    })
+                    .size(12)
+                )
+                .on_press(Message::TogglePause(fullscreen_vid.id))
+                .padding(8)
+                .width(Length::Shrink)
+                .height(Length::Shrink),
+                button(
+                    text(if fullscreen_vid.video.looping() {
+                        "↻"
+                    } else {
+                        "→"
+                    })
+                    .size(12)
+                )
+                .on_press(Message::ToggleLoop(fullscreen_vid.id))
+                .padding(8)
+                .width(Length::Shrink)
+                .height(Length::Shrink),
+                button(text(if fullscreen_vid.video.muted() { "M" } else { "~" }).size(12))
+                    .on_press(Message::ToggleMute(fullscreen_vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+                button(text("V").size(12))
+                    .on_press(Message::ToggleFullscreen(fullscreen_vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+                text(format!(
+                    "{}:{:02}",
+                    fullscreen_vid.position as u64 / 60,
+                    fullscreen_vid.position as u64 % 60
+                ))
+                .size(12)
+            ]
+            .spacing(5)
+            .align_y(alignment::Vertical::Center)
+            .width(Length::Shrink)
+        ]
+        .spacing(5)
+        .padding(10),
+    )
+    .style(|_theme: &Theme| container::Style {
+        background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
+        ..Default::default()
+    })
+    .width(Length::Fill);
+
+    let overlay = container(
+        column![
+            top_bar,
+            // Center spacer (transparent)
+            container("").height(Length::Fill),
+            bottom_bar
+        ],
+    )
     .width(Length::Fill)
     .height(Length::Fill);
 
@@ -427,36 +463,48 @@ fn render_fullscreen_photo<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Eleme
         .center_x(Length::Fill)
         .center_y(Length::Fill);
 
-    let overlay = container(
-        column![
-            // Top bar with filename and close button
-            row![
-                text(&photo.filename).size(14).color(Color::WHITE),
-                container("").width(Length::Fill),
-                button(text("X").size(20))
-                    .on_press(Message::ToggleFullscreen(photo.id))
-                    .padding(5)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink)
-            ]
-            .padding(10),
-            // Center spacer
-            container("").height(Length::Fill),
-            // Bottom controls
-            row![button(text("V").size(12))
+    let top_bar = container(
+        row![
+            text(&photo.filename).size(14).color(Color::WHITE),
+            container("").width(Length::Fill),
+            button(text("X").size(20))
                 .on_press(Message::ToggleFullscreen(photo.id))
-                .padding(8)
+                .padding(5)
                 .width(Length::Shrink)
-                .height(Length::Shrink),]
-            .spacing(5)
-            .align_y(alignment::Vertical::Center)
-            .padding(10)
-        ],
+                .height(Length::Shrink)
+        ]
+        .padding(10),
     )
     .style(|_theme: &Theme| container::Style {
         background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
         ..Default::default()
     })
+    .width(Length::Fill);
+
+    let bottom_bar = container(
+        row![button(text("V").size(12))
+            .on_press(Message::ToggleFullscreen(photo.id))
+            .padding(8)
+            .width(Length::Shrink)
+            .height(Length::Shrink),]
+        .spacing(5)
+        .align_y(alignment::Vertical::Center)
+        .padding(10),
+    )
+    .style(|_theme: &Theme| container::Style {
+        background: Some(Color::from_rgba(0.0, 0.0, 0.0, 0.7).into()),
+        ..Default::default()
+    })
+    .width(Length::Fill);
+
+    let overlay = container(
+        column![
+            top_bar,
+            // Center spacer (transparent)
+            container("").height(Length::Fill),
+            bottom_bar
+        ],
+    )
     .width(Length::Fill)
     .height(Length::Fill);
 
