@@ -1,3 +1,4 @@
+use iced::widget::image::Handle;
 use iced_video_player::Video;
 use std::time::Instant;
 use tempfile::TempDir;
@@ -22,9 +23,40 @@ pub struct VideoInstance {
     pub pending_position_update: bool,
 }
 
-/// Application state containing all videos and UI state.
+/// Represents a single photo instance in the player.
+pub struct PhotoInstance {
+    pub id: usize,
+    pub handle: Handle,
+    pub hovered: bool,
+    pub fullscreen: bool,
+    pub filename: String,
+}
+
+/// Unified media item that can be either a video or a photo.
+pub enum MediaItem {
+    Video(VideoInstance),
+    Photo(PhotoInstance),
+}
+
+impl MediaItem {
+    pub fn id(&self) -> usize {
+        match self {
+            MediaItem::Video(v) => v.id,
+            MediaItem::Photo(p) => p.id,
+        }
+    }
+
+    pub fn is_fullscreen(&self) -> bool {
+        match self {
+            MediaItem::Video(v) => v.fullscreen,
+            MediaItem::Photo(p) => p.fullscreen,
+        }
+    }
+}
+
+/// Application state containing all media and UI state.
 pub struct App {
-    pub videos: Vec<VideoInstance>,
+    pub media: Vec<MediaItem>,
     pub next_id: usize,
     pub grid_columns: usize,
     pub error: Option<String>,
@@ -34,11 +66,11 @@ pub struct App {
 impl Default for App {
     fn default() -> Self {
         App {
-            videos: Vec::new(),
+            media: Vec::new(),
             next_id: 0,
             grid_columns: 2, // Default to 2 columns
             error: None,
-            status: "Drop video files here to load them".to_string(),
+            status: "Drop media files here to load them".to_string(),
         }
     }
 }

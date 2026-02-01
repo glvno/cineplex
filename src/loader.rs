@@ -1,26 +1,93 @@
+use iced::widget::image::Handle;
 use iced_video_player::Video;
+use std::ffi::OsStr;
 use std::path::PathBuf;
 use std::time::Instant;
 
-use crate::state::{App, VideoInstance};
+use crate::state::{App, MediaItem, PhotoInstance, VideoInstance};
 
-/// Load a video from a file path.
-pub fn load_video_from_path(app: &mut App, video_path: PathBuf) {
-    app.status = "Loading video...".to_string();
+/// Supported video extensions (case-insensitive check performed separately).
+const VIDEO_EXTENSIONS: &[&str] = &["mov", "mp4", "m4v", "mkv", "avi", "webm"];
 
-    match std::fs::metadata(&video_path) {
+/// Supported image extensions (case-insensitive check performed separately).
+const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "tif"];
+
+/// Determine if a path is a video file.
+fn is_video_file(path: &PathBuf) -> bool {
+    path.extension()
+        .and_then(OsStr::to_str)
+        .map(|ext| VIDEO_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+/// Determine if a path is an image file.
+fn is_image_file(path: &PathBuf) -> bool {
+    path.extension()
+        .and_then(OsStr::to_str)
+        .map(|ext| IMAGE_EXTENSIONS.contains(&ext.to_lowercase().as_str()))
+        .unwrap_or(false)
+}
+
+/// Load a media file (video or photo) from a file path.
+pub fn load_media_from_path(app: &mut App, path: PathBuf) {
+    app.status = "Loading...".to_string();
+
+    match std::fs::metadata(&path) {
         Ok(_) => {
-            load_direct_video(app, &video_path);
+            if is_video_file(&path) {
+                load_direct_video(app, &path);
+            } else if is_image_file(&path) {
+                load_photo(app, &path);
+            } else {
+                app.error = Some(format!(
+                    "Unsupported file type: {}",
+                    path.extension()
+                        .and_then(OsStr::to_str)
+                        .unwrap_or("unknown")
+                ));
+            }
         }
         Err(e) => {
-            app.error = Some(format!("Video file not found: {}", e));
+            app.error = Some(format!("File not found: {}", e));
         }
     }
 }
 
+/// Load a photo from a file path.
+fn load_photo(app: &mut App, photo_path: &PathBuf) {
+    let photo_id = app.next_id;
+    let filename = photo_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
+
+    let handle = Handle::from_path(photo_path);
+
+    let photo_instance = PhotoInstance {
+        id: photo_id,
+        handle,
+        hovered: false,
+        fullscreen: false,
+        filename: filename.clone(),
+    };
+
+    log::info!(
+        "Photo loaded: id={}, path={}, total_media={}",
+        photo_id,
+        photo_path.display(),
+        app.media.len() + 1
+    );
+
+    app.media.push(MediaItem::Photo(photo_instance));
+    app.next_id += 1;
+    app.error = None;
+    app.status = format!("Photo loaded: {}", filename);
+}
+
 /// Load a video directly without conversion.
-pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
-    match url::Url::from_file_path(&video_path) {
+fn load_direct_video(app: &mut App, video_path: &PathBuf) {
+    match url::Url::from_file_path(video_path) {
         Ok(url) => match Video::new(&url) {
             Ok(mut video) => {
                 video.set_muted(true);
@@ -47,13 +114,13 @@ pub fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                     pending_position_update: false,
                 };
                 log::info!(
-                    "Video loaded: id={}, path={}, fps={}, total_videos={}",
+                    "Video loaded: id={}, path={}, fps={}, total_media={}",
                     video_id,
                     video_path.display(),
                     native_fps,
-                    app.videos.len() + 1
+                    app.media.len() + 1
                 );
-                app.videos.push(video_instance);
+                app.media.push(MediaItem::Video(video_instance));
                 app.next_id += 1;
                 app.error = None;
                 app.status = format!(

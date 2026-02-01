@@ -5,37 +5,46 @@ use std::time::Duration;
 use crate::cache;
 use crate::loader;
 use crate::message::Message;
-use crate::state::App;
+use crate::state::{App, MediaItem};
 use crate::sync::{synchronized_seek, synchronized_set_paused};
 use crate::ui;
 
 impl App {
+    /// Find a video by ID.
+    fn find_video_mut(&mut self, id: usize) -> Option<&mut crate::state::VideoInstance> {
+        self.media.iter_mut().find_map(|m| match m {
+            MediaItem::Video(v) if v.id == id => Some(v),
+            _ => None,
+        })
+    }
+
     /// Handle UI messages and state updates.
     pub fn update(&mut self, message: Message) {
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()
                     .add_filter(
-                        "Videos",
+                        "Media",
                         &[
                             "mov", "MOV", "mp4", "MP4", "m4v", "M4V", "mkv", "MKV", "avi", "AVI",
-                            "webm", "WEBM",
+                            "webm", "WEBM", "jpg", "JPG", "jpeg", "JPEG", "png", "PNG", "gif",
+                            "GIF", "bmp", "BMP", "webp", "WEBP", "tiff", "TIFF", "tif", "TIF",
                         ],
                     )
                     .pick_file()
                 {
-                    loader::load_video_from_path(self, path);
+                    loader::load_media_from_path(self, path);
                 }
             }
             Message::ClearCache => {
                 self.status = cache::clear_cache();
             }
             Message::FileDropped(path) => {
-                loader::load_video_from_path(self, path);
+                loader::load_media_from_path(self, path);
             }
             Message::EventOccurred(event) => match event {
                 iced::Event::Window(iced::window::Event::FileDropped(path)) => {
-                    loader::load_video_from_path(self, path);
+                    loader::load_media_from_path(self, path);
                 }
                 iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
                     key: iced::keyboard::Key::Named(key),
@@ -68,14 +77,14 @@ impl App {
                 }
             }
             Message::TogglePause(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if let Some(vid) = self.find_video_mut(id) {
                     let was_paused = vid.video.paused();
                     synchronized_set_paused(&mut vid.video, !was_paused);
                     log::debug!("Video pause toggled: id={}, paused={}", id, !was_paused);
                 }
             }
             Message::ToggleLoop(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if let Some(vid) = self.find_video_mut(id) {
                     let new_looping_state = !vid.video.looping();
                     vid.video.set_looping(new_looping_state);
                     vid.looping_enabled = new_looping_state;
@@ -87,7 +96,7 @@ impl App {
                 }
             }
             Message::ToggleMute(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if let Some(vid) = self.find_video_mut(id) {
                     let current_muted = vid.video.muted();
                     if current_muted {
                         // Unmute: restore volume to 1.0 and unmute
@@ -101,12 +110,15 @@ impl App {
                 }
             }
             Message::ToggleFullscreen(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
-                    vid.fullscreen = !vid.fullscreen;
+                if let Some(item) = self.media.iter_mut().find(|m| m.id() == id) {
+                    match item {
+                        MediaItem::Video(v) => v.fullscreen = !v.fullscreen,
+                        MediaItem::Photo(p) => p.fullscreen = !p.fullscreen,
+                    }
                 }
             }
             Message::Seek(id, secs) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if let Some(vid) = self.find_video_mut(id) {
                     // Validate secs is a valid number
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
@@ -118,7 +130,7 @@ impl App {
                 }
             }
             Message::SeekRelease(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if let Some(vid) = self.find_video_mut(id) {
                     vid.dragging = false;
                     // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
                     if vid.position.is_finite() && vid.position >= 0.0 {
@@ -136,7 +148,7 @@ impl App {
             Message::EndOfStream(id) => {
                 // GStreamer handles looping internally via video.set_looping(true)
                 // We just log it for diagnostics. Don't trigger seek here - let GStreamer loop naturally.
-                if let Some(_vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if self.find_video_mut(id).is_some() {
                     log::debug!(
                         "Video reached end of stream (GStreamer looping handles restart): id={}",
                         id
@@ -144,7 +156,7 @@ impl App {
                 }
             }
             Message::NewFrame(id) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
+                if let Some(vid) = self.find_video_mut(id) {
                     // Update FPS counter (recalculate every second for efficiency)
                     vid.frame_count += 1;
                     let elapsed = vid.last_fps_time.elapsed();
@@ -176,20 +188,23 @@ impl App {
                     vid.last_ui_update = std::time::Instant::now();
                 }
             }
-            Message::RemoveVideo(id) => {
-                let before_count = self.videos.len();
-                self.videos.retain(|v| v.id != id);
-                if before_count != self.videos.len() {
+            Message::RemoveMedia(id) => {
+                let before_count = self.media.len();
+                self.media.retain(|m| m.id() != id);
+                if before_count != self.media.len() {
                     log::info!(
-                        "Video removed: id={}, remaining_videos={}",
+                        "Media removed: id={}, remaining_media={}",
                         id,
-                        self.videos.len()
+                        self.media.len()
                     );
                 }
             }
-            Message::VideoHoverChanged(id, hovered) => {
-                if let Some(vid) = self.videos.iter_mut().find(|v| v.id == id) {
-                    vid.hovered = hovered;
+            Message::MediaHoverChanged(id, hovered) => {
+                if let Some(item) = self.media.iter_mut().find(|m| m.id() == id) {
+                    match item {
+                        MediaItem::Video(v) => v.hovered = hovered,
+                        MediaItem::Photo(p) => p.hovered = hovered,
+                    }
                 }
             }
         }
