@@ -1,6 +1,7 @@
 use iced::event;
+use iced::time;
 use iced::{Element, Subscription};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::cache;
 use crate::loader;
@@ -201,11 +202,34 @@ impl App {
             }
             Message::MediaHoverChanged(id, hovered) => {
                 if let Some(item) = self.media.iter_mut().find(|m| m.id() == id) {
+                    let now = Instant::now();
                     match item {
-                        MediaItem::Video(v) => v.hovered = hovered,
-                        MediaItem::Photo(p) => p.hovered = hovered,
+                        MediaItem::Video(v) => {
+                            v.hovered = hovered;
+                            if hovered {
+                                v.last_mouse_activity = now;
+                            }
+                        }
+                        MediaItem::Photo(p) => {
+                            p.hovered = hovered;
+                            if hovered {
+                                p.last_mouse_activity = now;
+                            }
+                        }
                     }
                 }
+            }
+            Message::MouseMoved(id) => {
+                if let Some(item) = self.media.iter_mut().find(|m| m.id() == id) {
+                    let now = Instant::now();
+                    match item {
+                        MediaItem::Video(v) => v.last_mouse_activity = now,
+                        MediaItem::Photo(p) => p.last_mouse_activity = now,
+                    }
+                }
+            }
+            Message::UiFadeTick => {
+                // Just triggers a re-render; opacity is computed in view
             }
             Message::LoadInitialFiles(paths) => {
                 for path in paths {
@@ -217,7 +241,20 @@ impl App {
 
     /// Subscribe to events.
     pub fn subscription(&self) -> Subscription<Message> {
-        event::listen().map(Message::EventOccurred)
+        // Only tick when there's media that might need fading
+        let has_hovered_media = self.media.iter().any(|m| match m {
+            MediaItem::Video(v) => v.hovered,
+            MediaItem::Photo(p) => p.hovered,
+        });
+
+        if has_hovered_media {
+            Subscription::batch([
+                event::listen().map(Message::EventOccurred),
+                time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick),
+            ])
+        } else {
+            event::listen().map(Message::EventOccurred)
+        }
     }
 
     /// Render the view.

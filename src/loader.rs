@@ -86,6 +86,7 @@ fn load_photo(app: &mut App, photo_path: &PathBuf) {
         hovered: false,
         fullscreen: false,
         filename: filename.clone(),
+        last_mouse_activity: Instant::now(),
     };
 
     log::info!(
@@ -160,6 +161,7 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         native_fps,
         last_ui_update: now,
         pending_position_update: false,
+        last_mouse_activity: now,
     };
 
     log::info!(

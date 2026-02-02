@@ -4,7 +4,7 @@ version = "0.1.1"
 edition = "2024"
 
 [dependencies]
-iced = { version = "0.13.1", features = ["image"] }
+iced = { version = "0.13.1", features = ["image", "tokio"] }
 image = "0.25"
 iced_video_player = { git = "https://github.com/jazzfool/iced_video_player.git", branch = "master" }
 url = "2.5.7"

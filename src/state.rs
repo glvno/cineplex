@@ -21,6 +21,8 @@ pub struct VideoInstance {
     // Frame throttling for UI updates (max 30 FPS UI refreshes)
     pub last_ui_update: Instant,
     pub pending_position_update: bool,
+    // UI fade tracking
+    pub last_mouse_activity: Instant,
 }
 
 /// Represents a single photo instance in the player.
@@ -30,6 +32,8 @@ pub struct PhotoInstance {
     pub hovered: bool,
     pub fullscreen: bool,
     pub filename: String,
+    // UI fade tracking
+    pub last_mouse_activity: Instant,
 }
 
 /// Unified media item that can be either a video or a photo.

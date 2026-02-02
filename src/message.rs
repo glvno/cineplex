@@ -15,7 +15,10 @@ pub enum Message {
     // Shared messages (work for both videos and photos)
     RemoveMedia(usize),
     MediaHoverChanged(usize, bool),
+    MouseMoved(usize),
     ToggleFullscreen(usize),
+    // UI fade timer
+    UiFadeTick,
     // Grid controls
     IncreaseColumns,
     DecreaseColumns,
