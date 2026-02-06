@@ -127,9 +127,11 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
     };
 
     // Create pipeline with videoflip for automatic rotation based on metadata
+    // videorate ensures a fixed framerate (needed for VFR content that reports 0 fps)
     let pipeline_str = format!(
         "playbin uri=\"{}\" \
-         video-sink=\"videoflip method=automatic ! videoscale ! videoconvert ! \
+         video-sink=\"videoflip method=automatic ! videorate ! video/x-raw,framerate=30/1 ! \
+         videoscale ! videoconvert ! \
          appsink name=iced_video drop=true caps=video/x-raw,format=NV12,pixel-aspect-ratio=1/1\"",
         url.as_str()
     );
