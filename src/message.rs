@@ -24,7 +24,6 @@ pub enum Message {
     DecreaseColumns,
     // File loading
     BrowseFile,
-    ClearCache,
     FileDropped(PathBuf),
     EventOccurred(Event),
     LoadInitialFiles(Vec<PathBuf>),

@@ -613,9 +613,6 @@ fn render_controls_bar<'a>(app: &'a App) -> Element<'a, Message> {
             button(text("[Browse]").size(14))
                 .on_press(Message::BrowseFile)
                 .padding(5),
-            button(text("[Clear Cache]").size(12))
-                .on_press(Message::ClearCache)
-                .padding(5),
             text(count_text).size(12),
         ]
         .spacing(10)

@@ -3,7 +3,6 @@ use iced::time;
 use iced::{Element, Subscription};
 use std::time::{Duration, Instant};
 
-use crate::cache;
 use crate::loader;
 use crate::message::Message;
 use crate::state::{App, MediaItem};
@@ -36,9 +35,6 @@ impl App {
                 {
                     loader::load_media_from_path(self, path);
                 }
-            }
-            Message::ClearCache => {
-                self.status = cache::clear_cache();
             }
             Message::FileDropped(path) => {
                 loader::load_media_from_path(self, path);
