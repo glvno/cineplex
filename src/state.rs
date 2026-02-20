@@ -9,6 +9,7 @@ pub struct VideoInstance {
     pub video: Video,
     pub position: f64,
     pub dragging: bool,
+    pub was_paused_before_drag: bool,
     pub hovered: bool,
     pub looping_enabled: bool,
     pub fullscreen: bool,
@@ -18,9 +19,6 @@ pub struct VideoInstance {
     pub last_fps_time: Instant,
     pub current_fps: f64,
     pub native_fps: f64, // Native framerate of the video
-    // Frame throttling for UI updates (max 30 FPS UI refreshes)
-    pub last_ui_update: Instant,
-    pub pending_position_update: bool,
     // UI fade tracking
     pub last_mouse_activity: Instant,
 }

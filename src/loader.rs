@@ -153,6 +153,7 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         video,
         position: 0.0,
         dragging: false,
+        was_paused_before_drag: false,
         hovered: false,
         looping_enabled: true,
         fullscreen: false,
@@ -161,8 +162,6 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         last_fps_time: now,
         current_fps: 0.0,
         native_fps,
-        last_ui_update: now,
-        pending_position_update: false,
         last_mouse_activity: now,
     };
 

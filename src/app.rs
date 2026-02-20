@@ -119,27 +119,30 @@ impl App {
                     // Validate secs is a valid number
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
-                        // NOTE: Do NOT pause here - calling set_paused triggers audio sink state changes
-                        // that try to acquire CoreAudio HALB_Mutex, causing deadlock with other threads.
-                        // Let video continue playing while user scrubs.
+                        vid.was_paused_before_drag = vid.video.paused();
+                        // Pause during scrubbing for smoother experience
+                        synchronized_set_paused(&mut vid.video, true);
                         vid.position = secs;
                     }
                 }
             }
             Message::SeekRelease(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
+                    let was_paused = vid.was_paused_before_drag;
                     vid.dragging = false;
                     // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
                     if vid.position.is_finite() && vid.position >= 0.0 {
-                        // Use synchronized_seek to prevent concurrent FLUSH_START deadlocks
+                        // Perform accurate seek
                         let _ = synchronized_seek(
                             &mut vid.video,
                             Duration::from_secs_f64(vid.position),
-                            false,
+                            true,
                         );
                     }
-                    // NOTE: Do NOT resume here - calling set_paused triggers audio sink state changes
-                    // that deadlock. Just let the seek complete naturally.
+                    // Resume playback if it wasn't paused before dragging
+                    if !was_paused {
+                        synchronized_set_paused(&mut vid.video, false);
+                    }
                 }
             }
             Message::EndOfStream(id) => {
@@ -163,26 +166,10 @@ impl App {
                         vid.last_fps_time = std::time::Instant::now();
                     }
 
-                    // NOTE: Calling video.position() causes a deadlock due to GStreamer's CoreAudio
-                    // latency query trying to acquire a mutex from the main thread. This appears to be
-                    // a fundamental issue with GStreamer's OSX audio sink and CoreAudio interaction.
-                    // Disabling position updates to prevent deadlocks. Videos still loop correctly
-                    // via GStreamer's internal looping mechanism (video.set_looping(true)).
-                    // Position remains at 0.0 in the UI, but the core functionality works reliably.
+                    // Update position from video (unless user is dragging the scrubber)
                     if !vid.dragging {
-                        // DO NOT QUERY POSITION - causes deadlock with CoreAudio
-                        // vid.position remains 0.0 to avoid UI updates that trigger GStreamer queries
+                        vid.position = vid.video.position().as_secs_f64();
                     }
-
-                    // Throttle UI updates to 30 FPS max (~33ms between redraws)
-                    // Store that there's a pending update even if we skip the redraw
-                    vid.pending_position_update = true;
-                    let ui_update_elapsed = vid.last_ui_update.elapsed().as_millis() as u32;
-                    if ui_update_elapsed < 33 {
-                        // Skip redraw - return early to suppress view() rebuild
-                        return;
-                    }
-                    vid.last_ui_update = std::time::Instant::now();
                 }
             }
             Message::RemoveMedia(id) => {
