@@ -8,6 +8,13 @@ use iced::stream;
 use iced::Subscription;
 use std::time::Duration;
 
+// Data structure containing all the info needed for the bus monitor subscription
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct BusMonitorData {
+    video_ids: Vec<usize>,
+    videos: Vec<(usize, gstreamer::Pipeline)>,
+}
+
 /// Creates a subscription that monitors GStreamer bus messages for all videos.
 pub fn bus_monitor_subscription(
     videos: &[(usize, gstreamer::Pipeline)],
@@ -16,21 +23,36 @@ pub fn bus_monitor_subscription(
         return Subscription::none();
     }
 
-    // Create a stable ID based on video IDs
-    #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-    struct BusMonitorId(Vec<usize>);
-
     let video_ids: Vec<usize> = videos.iter().map(|(id, _)| *id).collect();
     let videos: Vec<(usize, gstreamer::Pipeline)> = videos.to_vec();
 
-    Subscription::run_with_id(
-        BusMonitorId(video_ids.clone()),
-        stream::channel(100, move |mut output| async move {
-            log::info!("Bus monitor started, monitoring {} videos: {:?}", videos.len(), video_ids);
+    Subscription::run_with(
+        BusMonitorData {
+            video_ids: video_ids.clone(),
+            videos: videos.clone(),
+        },
+        run_bus_monitor,
+    )
+}
 
-            loop {
-                // Check all video buses for messages
-                for (video_id, pipeline) in &videos {
+fn run_bus_monitor(
+    data: &BusMonitorData,
+) -> futures::stream::BoxStream<'static, crate::message::Message> {
+    use futures::StreamExt;
+
+    let video_ids = data.video_ids.clone();
+    let videos = data.videos.clone();
+
+    stream::channel(100, move |mut output: futures::channel::mpsc::Sender<crate::message::Message>| async move {
+        log::info!(
+            "Bus monitor started, monitoring {} videos: {:?}",
+            videos.len(),
+            video_ids
+        );
+
+        loop {
+            // Check all video buses for messages
+            for (video_id, pipeline) in &videos {
                     if let Some(bus) = pipeline.bus() {
                         // Non-blocking check for messages (timeout = 0)
                         while let Some(msg) = bus.timed_pop(gstreamer::ClockTime::ZERO) {
@@ -71,9 +93,9 @@ pub fn bus_monitor_subscription(
                     }
                 }
 
-                // Small delay before next poll (16ms = ~60Hz)
-                tokio::time::sleep(Duration::from_millis(16)).await;
-            }
-        }),
-    )
+            // Small delay before next poll (16ms = ~60Hz)
+            tokio::time::sleep(Duration::from_millis(16)).await;
+        }
+    })
+    .boxed()
 }

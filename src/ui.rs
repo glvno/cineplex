@@ -16,16 +16,21 @@ const FADE_DURATION_SECS: f64 = 0.5;
 
 /// Compute UI opacity based on time since last mouse activity.
 /// Returns 1.0 for fully visible, 0.0 for fully hidden.
+/// Quantized to steps of 0.1 to prevent continuous layout invalidation.
 fn compute_ui_opacity(last_mouse_activity: Instant) -> f32 {
     let elapsed = last_mouse_activity.elapsed().as_secs_f64();
-    if elapsed < FADE_DELAY_SECS {
+    let raw_opacity = if elapsed < FADE_DELAY_SECS {
         1.0
     } else if elapsed < FADE_DELAY_SECS + FADE_DURATION_SECS {
         let fade_progress = (elapsed - FADE_DELAY_SECS) / FADE_DURATION_SECS;
-        (1.0 - fade_progress) as f32
+        1.0 - fade_progress as f32
     } else {
         0.0
-    }
+    };
+
+    // Quantize to 0.1 steps to prevent creating new closures on every frame
+    // This stops Iced from seeing layout changes when opacity changes continuously
+    (raw_opacity * 10.0).round() / 10.0
 }
 
 /// Get the safe duration of a video, handling invalid values.
@@ -78,8 +83,9 @@ pub fn create_media_cell<'a>(app: &'a App, item: &'a MediaItem) -> Element<'a, M
 pub fn create_video_cell<'a>(_app: &'a App, vid: &'a VideoInstance) -> Element<'a, Message> {
     let video_player = container(
         VideoPlayer::new(&vid.video)
-            .on_end_of_stream(Message::EndOfStream(vid.id))
-            .on_new_frame(Message::NewFrame(vid.id)),
+            .on_end_of_stream(Message::EndOfStream(vid.id)),
+            // Removed on_new_frame to prevent layout invalidation warnings
+            // FPS is now tracked via UiFadeTick subscription instead
     )
     .width(Length::Fill)
     .height(Length::Fill)
@@ -191,9 +197,9 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
     let top_bar = container(
         row![
             {
-                let fps_text = get_fps_display(vid.current_fps);
-                let base_fps_color = get_fps_color(vid.current_fps, vid.native_fps);
-                let fps_color = Color::from_rgba(base_fps_color.r, base_fps_color.g, base_fps_color.b, opacity);
+                // Display native FPS instead of calculated to avoid excessive state updates
+                let fps_text = get_fps_display(vid.native_fps);
+                let fps_color = Color::from_rgba(0.0, 1.0, 0.0, opacity); // Green for native FPS
                 text(fps_text)
                     .size(14)
                     .shaping(Shaping::Basic)
@@ -372,7 +378,8 @@ fn render_fullscreen_video<'a>(
 ) -> Element<'a, Message> {
     let video_player = VideoPlayer::new(&fullscreen_vid.video)
         .on_end_of_stream(Message::EndOfStream(fullscreen_vid.id))
-        .on_new_frame(Message::NewFrame(fullscreen_vid.id))
+        // Removed on_new_frame to prevent layout invalidation warnings
+        // FPS is now tracked via UiFadeTick subscription instead
         .content_fit(iced::ContentFit::Contain)
         .width(Length::Fill)
         .height(Length::Fill);
@@ -387,10 +394,9 @@ fn render_fullscreen_video<'a>(
         let top_bar = container(
             row![
                 {
-                    let fps_text = get_fps_display(fullscreen_vid.current_fps);
-                    let base_fps_color =
-                        get_fps_color(fullscreen_vid.current_fps, fullscreen_vid.native_fps);
-                    let fps_color = Color::from_rgba(base_fps_color.r, base_fps_color.g, base_fps_color.b, opacity);
+                    // Display native FPS instead of calculated to avoid excessive state updates
+                    let fps_text = get_fps_display(fullscreen_vid.native_fps);
+                    let fps_color = Color::from_rgba(0.0, 1.0, 0.0, opacity); // Green for native FPS
                     text(fps_text)
                         .size(14)
                         .shaping(Shaping::Basic)

@@ -23,24 +23,6 @@ impl App {
         // Signal watchdog that UI thread is alive
         self.watchdog.heartbeat();
 
-        // Check position thread for updates (non-blocking)
-        let mut position_updates = Vec::new();
-        if let Some(ref rx) = self.position_thread_rx {
-            while let Ok(update) = rx.try_recv() {
-                position_updates.push(update);
-            }
-        }
-
-        // Apply position updates
-        for update in position_updates {
-            if let Some(vid) = self.find_video_mut(update.video_id) {
-                // Only update position if user isn't dragging
-                if !vid.dragging {
-                    vid.position = update.position;
-                }
-            }
-        }
-
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()
@@ -180,24 +162,35 @@ impl App {
                     );
                 }
             }
-            Message::NewFrame(id) => {
-                if let Some(vid) = self.find_video_mut(id) {
-                    // Update FPS counter (recalculate every second for efficiency)
-                    vid.frame_count += 1;
-                    let elapsed = vid.last_fps_time.elapsed();
-                    if elapsed.as_secs_f64() >= 1.0 {
-                        vid.current_fps = vid.frame_count as f64 / elapsed.as_secs_f64();
-                        vid.frame_count = 0;
-                        vid.last_fps_time = std::time::Instant::now();
-                    }
-
-                    // Position is now updated via PositionTick subscription
-                    // to decouple it from frame rendering and reduce blocking
-                }
+            Message::NewFrame(_id) => {
+                // No longer used - removed on_new_frame callback to prevent
+                // layout invalidation warnings caused by excessive view() calls
+                // FPS is now displayed using native_fps instead of calculated FPS
             }
             Message::PositionTick => {
-                // Position updates now come from position_thread (background thread)
-                // This subscription is just kept for potential future use
+                // Process position updates from background thread
+                // Only process on PositionTick to avoid excessive re-renders
+                let mut position_updates = Vec::new();
+                if let Some(ref rx) = self.position_thread_rx {
+                    while let Ok(update) = rx.try_recv() {
+                        position_updates.push(update);
+                    }
+                }
+
+                // Apply position updates only if display value changed
+                for update in position_updates {
+                    if let Some(vid) = self.find_video_mut(update.video_id) {
+                        // Only update position if user isn't dragging
+                        if !vid.dragging {
+                            // Only update if the displayed value changed (whole seconds)
+                            let old_display_pos = vid.position as u64;
+                            let new_display_pos = update.position as u64;
+                            if old_display_pos != new_display_pos || (vid.position - update.position).abs() > 1.0 {
+                                vid.position = update.position;
+                            }
+                        }
+                    }
+                }
             }
             Message::RemoveMedia(id) => {
                 let before_count = self.media.len();
@@ -245,7 +238,8 @@ impl App {
                 }
             }
             Message::UiFadeTick => {
-                // Just triggers a re-render; opacity is computed in view
+                // Just triggers fade animations - FPS now uses native_fps
+                // No state updates needed here, just triggers view() for fade recalculation
             }
             Message::LoadInitialFiles(paths) => {
                 for path in paths {
@@ -257,7 +251,7 @@ impl App {
 
     /// Subscribe to events.
     pub fn subscription(&self) -> Subscription<Message> {
-        // Only tick when there's media that might need fading
+        // Check if we need UI updates (fade or FPS tracking)
         let has_hovered_media = self.media.iter().any(|m| match m {
             MediaItem::Video(v) => v.hovered,
             MediaItem::Photo(p) => p.hovered,
@@ -267,7 +261,8 @@ impl App {
 
         let mut subscriptions = vec![event::listen().map(Message::EventOccurred)];
 
-        if has_hovered_media {
+        // Always tick when there are videos (for FPS updates) or hovered media (for fade)
+        if has_videos || has_hovered_media {
             subscriptions.push(time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick));
         }
 

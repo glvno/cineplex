@@ -27,16 +27,20 @@ fn main() -> iced::Result {
     // Collect initial files from command-line arguments
     let initial_files = collect_initial_files();
 
-    iced::application("Cineplex", App::update, App::view)
-        .subscription(App::subscription)
-        .run_with(move || {
+    iced::application(
+        move || {
             let task = if initial_files.is_empty() {
                 Task::none()
             } else {
-                Task::done(Message::LoadInitialFiles(initial_files))
+                Task::done(Message::LoadInitialFiles(initial_files.clone()))
             };
             (App::default(), task)
-        })
+        },
+        App::update,
+        App::view,
+    )
+    .subscription(App::subscription)
+    .run()
 }
 
 /// Collect media files from command-line arguments.
