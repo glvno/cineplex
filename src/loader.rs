@@ -165,7 +165,11 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         dragging: false,
         was_paused_before_drag: false,
         hovered: false,
-        looping_enabled: true,
+        // Cached GStreamer state - initialized to match loader settings
+        is_paused: false,  // Videos start playing
+        is_looping: true,  // Looping enabled by default
+        is_muted: true,    // Muted by default
+        looping_enabled: true, // Legacy field
         fullscreen: false,
         _temp_dir: None,
         frame_count: 0,

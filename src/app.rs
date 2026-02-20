@@ -78,35 +78,41 @@ impl App {
             }
             Message::TogglePause(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    let was_paused = vid.video.paused();
-                    synchronized_set_paused(id, &mut vid.video, !was_paused);
-                    log::debug!("Video pause toggled: id={}, paused={}", id, !was_paused);
+                    // Use cached state instead of querying GStreamer (which can block)
+                    let new_paused = !vid.is_paused;
+                    synchronized_set_paused(id, &mut vid.video, new_paused);
+                    vid.is_paused = new_paused; // Update cache
+                    log::debug!("Video pause toggled: id={}, paused={}", id, new_paused);
                 }
             }
             Message::ToggleLoop(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    let new_looping_state = !vid.video.looping();
-                    vid.video.set_looping(new_looping_state);
-                    vid.looping_enabled = new_looping_state;
+                    // Use cached state instead of querying GStreamer (which can block)
+                    let new_looping = !vid.is_looping;
+                    vid.video.set_looping(new_looping);
+                    vid.is_looping = new_looping; // Update cache
+                    vid.looping_enabled = new_looping; // Update legacy field
                     log::debug!(
                         "Video looping toggled: id={}, looping={}",
                         id,
-                        new_looping_state
+                        new_looping
                     );
                 }
             }
             Message::ToggleMute(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    let current_muted = vid.video.muted();
-                    if current_muted {
-                        // Unmute: restore volume to 1.0 and unmute
-                        vid.video.set_volume(1.0);
-                        vid.video.set_muted(false);
-                    } else {
+                    // Use cached state instead of querying GStreamer (which can block)
+                    let new_muted = !vid.is_muted;
+                    if new_muted {
                         // Mute: set volume to 0 and mute
                         vid.video.set_volume(0.0);
                         vid.video.set_muted(true);
+                    } else {
+                        // Unmute: restore volume to 1.0 and unmute
+                        vid.video.set_volume(1.0);
+                        vid.video.set_muted(false);
                     }
+                    vid.is_muted = new_muted; // Update cache
                 }
             }
             Message::ToggleFullscreen(id) => {
@@ -122,7 +128,8 @@ impl App {
                     // Validate secs is a valid number
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
-                        vid.was_paused_before_drag = vid.video.paused();
+                        // Use cached state instead of querying GStreamer (which can block)
+                        vid.was_paused_before_drag = vid.is_paused;
                         // Just update UI position while dragging
                         vid.position = secs;
                     }

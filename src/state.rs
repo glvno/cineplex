@@ -13,7 +13,11 @@ pub struct VideoInstance {
     pub dragging: bool,
     pub was_paused_before_drag: bool,
     pub hovered: bool,
-    pub looping_enabled: bool,
+    // Cached GStreamer state (NEVER query video.paused/looping/muted on main thread - use these!)
+    pub is_paused: bool,
+    pub is_looping: bool,
+    pub is_muted: bool,
+    pub looping_enabled: bool, // Legacy field, use is_looping instead
     pub fullscreen: bool,
     pub _temp_dir: Option<TempDir>,
     // Framerate monitoring
