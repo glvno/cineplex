@@ -148,9 +148,19 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
     // Query duration once at load time to avoid blocking during UI rendering
     let duration = {
         let raw_duration = video.duration().as_secs_f64();
+        log::info!(
+            "Duration query for {}: raw_duration={:.2}s, is_finite={}",
+            video_path.file_name().unwrap_or_default().to_string_lossy(),
+            raw_duration,
+            raw_duration.is_finite()
+        );
         if raw_duration.is_finite() && raw_duration > 0.0 {
             raw_duration
         } else {
+            log::warn!(
+                "Invalid duration for {}, defaulting to 1.0s",
+                video_path.file_name().unwrap_or_default().to_string_lossy()
+            );
             1.0 // Default to 1 second if invalid
         }
     };

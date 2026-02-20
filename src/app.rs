@@ -160,13 +160,42 @@ impl App {
                 log::debug!("SeekComplete message received for video_id={} (ignored)", id);
             }
             Message::EndOfStream(id) => {
-                // GStreamer handles looping internally via video.set_looping(true)
-                // We just log it for diagnostics. Don't trigger seek here - let GStreamer loop naturally.
-                if self.find_video_mut(id).is_some() {
-                    log::debug!(
-                        "Video reached end of stream (GStreamer looping handles restart): id={}",
-                        id
+                if let Some(vid) = self.find_video_mut(id) {
+                    log::warn!(
+                        "Video reached EOS: id={}, is_looping={}, position={:.2}s, duration={:.2}s",
+                        id,
+                        vid.is_looping,
+                        vid.position,
+                        vid.duration
                     );
+
+                    // Update duration to actual observed length if different
+                    if vid.position > vid.duration && vid.position.is_finite() {
+                        log::warn!(
+                            "Correcting duration for video {}: was {:.2}s, actual {:.2}s",
+                            id,
+                            vid.duration,
+                            vid.position
+                        );
+                        vid.duration = vid.position;
+                    }
+
+                    // If looping is enabled, manually seek to start
+                    // (GStreamer's automatic looping seems unreliable for some videos)
+                    if vid.is_looping {
+                        log::info!("Manually restarting loop for video_id={}", id);
+                        let _ = synchronized_seek(
+                            id,
+                            &mut vid.video,
+                            Duration::from_secs(0),
+                            false, // Use non-accurate seek for speed
+                        );
+                        // Ensure it's playing
+                        if vid.is_paused {
+                            synchronized_set_paused(id, &mut vid.video, false);
+                            vid.is_paused = false;
+                        }
+                    }
                 }
             }
             Message::NewFrame(_id) => {
@@ -194,6 +223,20 @@ impl App {
                             let new_display_pos = update.position as u64;
                             if old_display_pos != new_display_pos || (vid.position - update.position).abs() > 1.0 {
                                 vid.position = update.position;
+                            }
+
+                            // If position exceeds cached duration, the duration query was wrong
+                            // Expand duration to accommodate the actual playback length
+                            if update.position > vid.duration && update.position.is_finite() {
+                                let old_duration = vid.duration;
+                                vid.duration = (update.position * 1.1).max(vid.duration + 5.0); // Add 10% buffer or 5s, whichever is larger
+                                log::warn!(
+                                    "Video {} duration incorrect: cached={:.2}s, observed position={:.2}s, updating to={:.2}s",
+                                    update.video_id,
+                                    old_duration,
+                                    update.position,
+                                    vid.duration
+                                );
                             }
                         }
                     }
