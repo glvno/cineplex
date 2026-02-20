@@ -34,6 +34,9 @@ fn compute_ui_opacity(last_mouse_activity: Instant) -> f32 {
 }
 
 /// Get the safe duration of a video, handling invalid values.
+/// DEPRECATED: Use vid.duration instead to avoid blocking GStreamer queries.
+/// This function is kept for compatibility but should not be used.
+#[allow(dead_code)]
 pub fn safe_duration(video: &Video) -> f64 {
     let duration = video.duration().as_secs_f64();
     if duration.is_finite() && duration > 0.0 {
@@ -222,8 +225,8 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
 
     let bottom_bar = container(
         column![
-            // Seek slider
-            slider(0.0..=safe_duration(&vid.video), vid.position, move |pos| {
+            // Seek slider (use cached duration to avoid blocking GStreamer queries)
+            slider(0.0..=vid.duration, vid.position, move |pos| {
                 Message::Seek(vid.id, pos)
             })
             .step(0.1)
@@ -419,9 +422,9 @@ fn render_fullscreen_video<'a>(
 
         let bottom_bar = container(
             column![
-                // Seek slider
+                // Seek slider (use cached duration to avoid blocking GStreamer queries)
                 slider(
-                    0.0..=safe_duration(&fullscreen_vid.video),
+                    0.0..=fullscreen_vid.duration,
                     fullscreen_vid.position,
                     move |pos| Message::Seek(fullscreen_vid.id, pos)
                 )

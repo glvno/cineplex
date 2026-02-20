@@ -129,6 +129,35 @@ pub fn log_seek_complete(video_id: usize, actual: Duration, start: Instant) {
     }
 }
 
+/// Log the completion of a seek operation without querying position (to avoid blocking)
+pub fn log_seek_complete_no_position(video_id: usize, start: Instant) {
+    let elapsed = start.elapsed();
+    let elapsed_ms = elapsed.as_millis();
+
+    if elapsed_ms > 2000 {
+        log::error!(
+            "[{}] Video {} seek DEADLOCK SUSPECTED: {}ms",
+            LogCategory::Seek.as_str(),
+            video_id,
+            elapsed_ms
+        );
+    } else if elapsed_ms > 1000 {
+        log::warn!(
+            "[{}] Video {} seek SLOW: {}ms",
+            LogCategory::Seek.as_str(),
+            video_id,
+            elapsed_ms
+        );
+    } else {
+        log::info!(
+            "[{}] Video {} seek COMPLETE: {}ms",
+            LogCategory::Seek.as_str(),
+            video_id,
+            elapsed_ms
+        );
+    }
+}
+
 /// Log a seek error
 pub fn log_seek_error(video_id: usize, error: &str, start: Instant) {
     let elapsed_ms = start.elapsed().as_millis();

@@ -9,6 +9,7 @@ pub struct VideoInstance {
     pub id: usize,
     pub video: Video,
     pub position: f64,
+    pub duration: f64, // Cached duration to avoid blocking GStreamer queries during rendering
     pub dragging: bool,
     pub was_paused_before_drag: bool,
     pub hovered: bool,

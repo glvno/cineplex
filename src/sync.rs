@@ -2,6 +2,9 @@ use std::time::Duration;
 use crate::gst_logger;
 
 /// Perform a seek operation with timing instrumentation.
+///
+/// IMPORTANT: Does NOT query position after seek to avoid blocking the UI thread.
+/// Position will be updated by the background position thread.
 pub fn synchronized_seek(
     video_id: usize,
     video: &mut iced_video_player::Video,
@@ -14,8 +17,9 @@ pub fn synchronized_seek(
 
     match &result {
         Ok(_) => {
-            let actual_position = video.position();
-            gst_logger::log_seek_complete(video_id, actual_position, start);
+            // Don't query position here - it can block for 100ms+ on macOS CoreAudio
+            // Position will be updated by background position thread
+            gst_logger::log_seek_complete_no_position(video_id, start);
         }
         Err(e) => {
             gst_logger::log_seek_error(video_id, &e.to_string(), start);

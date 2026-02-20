@@ -145,6 +145,15 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
     };
 
     let native_fps = video.framerate();
+    // Query duration once at load time to avoid blocking during UI rendering
+    let duration = {
+        let raw_duration = video.duration().as_secs_f64();
+        if raw_duration.is_finite() && raw_duration > 0.0 {
+            raw_duration
+        } else {
+            1.0 // Default to 1 second if invalid
+        }
+    };
     let now = Instant::now();
     let video_id = app.next_id;
 
@@ -152,6 +161,7 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         id: video_id,
         video,
         position: 0.0,
+        duration,
         dragging: false,
         was_paused_before_drag: false,
         hovered: false,
