@@ -123,19 +123,17 @@ impl App {
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
                         vid.was_paused_before_drag = vid.video.paused();
-                        // Pause during scrubbing for smoother experience
-                        synchronized_set_paused(id, &mut vid.video, true);
+                        // Update position without pausing (reduces synchronous GStreamer calls)
                         vid.position = secs;
                     }
                 }
             }
             Message::SeekRelease(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    let was_paused = vid.was_paused_before_drag;
                     vid.dragging = false;
                     // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
                     if vid.position.is_finite() && vid.position >= 0.0 {
-                        // Perform accurate seek
+                        // Perform accurate seek without pause/unpause to reduce synchronous calls
                         let _ = synchronized_seek(
                             id,
                             &mut vid.video,
@@ -143,10 +141,7 @@ impl App {
                             true,
                         );
                     }
-                    // Resume playback if it wasn't paused before dragging
-                    if !was_paused {
-                        synchronized_set_paused(id, &mut vid.video, false);
-                    }
+                    // Note: Video continues playing during/after seek unless user paused it
                 }
             }
             Message::EndOfStream(id) => {
