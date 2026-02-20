@@ -63,6 +63,7 @@ pub struct App {
     pub grid_columns: usize,
     pub error: Option<String>,
     pub status: String,
+    pub watchdog: crate::watchdog::Watchdog,
 }
 
 impl Default for App {
@@ -73,6 +74,7 @@ impl Default for App {
             grid_columns: 2, // Default to 2 columns
             error: None,
             status: "Drop media files here to load them".to_string(),
+            watchdog: crate::watchdog::Watchdog::spawn(),
         }
     }
 }

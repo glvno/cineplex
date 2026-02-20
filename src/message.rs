@@ -12,6 +12,7 @@ pub enum Message {
     EndOfStream(usize),
     NewFrame(usize),
     ToggleMute(usize),
+    PositionTick, // Periodic position update trigger
     // Shared messages (work for both videos and photos)
     RemoveMedia(usize),
     MediaHoverChanged(usize, bool),

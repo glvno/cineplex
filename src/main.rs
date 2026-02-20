@@ -1,9 +1,12 @@
 mod app;
+mod gst_logger;
 mod loader;
 mod message;
+mod position_poller;
 mod state;
 mod sync;
 mod ui;
+mod watchdog;
 
 use iced::Task;
 use message::Message;

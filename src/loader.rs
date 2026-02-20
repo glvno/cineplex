@@ -165,6 +165,7 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         last_mouse_activity: now,
     };
 
+    crate::gst_logger::log_video_created(video_id, &video_path.display().to_string());
     log::info!(
         "Video loaded: id={}, path={}, fps={}, total_media={}",
         video_id,

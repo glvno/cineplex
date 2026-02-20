@@ -20,6 +20,9 @@ impl App {
 
     /// Handle UI messages and state updates.
     pub fn update(&mut self, message: Message) {
+        // Signal watchdog that UI thread is alive
+        self.watchdog.heartbeat();
+
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()
@@ -76,7 +79,7 @@ impl App {
             Message::TogglePause(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
                     let was_paused = vid.video.paused();
-                    synchronized_set_paused(&mut vid.video, !was_paused);
+                    synchronized_set_paused(id, &mut vid.video, !was_paused);
                     log::debug!("Video pause toggled: id={}, paused={}", id, !was_paused);
                 }
             }
@@ -121,7 +124,7 @@ impl App {
                         vid.dragging = true;
                         vid.was_paused_before_drag = vid.video.paused();
                         // Pause during scrubbing for smoother experience
-                        synchronized_set_paused(&mut vid.video, true);
+                        synchronized_set_paused(id, &mut vid.video, true);
                         vid.position = secs;
                     }
                 }
@@ -134,6 +137,7 @@ impl App {
                     if vid.position.is_finite() && vid.position >= 0.0 {
                         // Perform accurate seek
                         let _ = synchronized_seek(
+                            id,
                             &mut vid.video,
                             Duration::from_secs_f64(vid.position),
                             true,
@@ -141,7 +145,7 @@ impl App {
                     }
                     // Resume playback if it wasn't paused before dragging
                     if !was_paused {
-                        synchronized_set_paused(&mut vid.video, false);
+                        synchronized_set_paused(id, &mut vid.video, false);
                     }
                 }
             }
@@ -166,14 +170,33 @@ impl App {
                         vid.last_fps_time = std::time::Instant::now();
                     }
 
-                    // Update position from video (unless user is dragging the scrubber)
-                    if !vid.dragging {
-                        vid.position = vid.video.position().as_secs_f64();
+                    // Position is now updated via PositionTick subscription
+                    // to decouple it from frame rendering and reduce blocking
+                }
+            }
+            Message::PositionTick => {
+                // Update positions for all videos (unless user is dragging)
+                // This runs at 10Hz independent of frame rate
+                for item in &mut self.media {
+                    if let MediaItem::Video(vid) = item {
+                        if !vid.dragging {
+                            let thread_id = std::thread::current().id();
+                            let start = crate::gst_logger::log_position_query_start(vid.id, thread_id);
+                            let position = vid.video.position();
+                            crate::gst_logger::log_position_query_complete(vid.id, position, start);
+                            vid.position = position.as_secs_f64();
+                        }
                     }
                 }
             }
             Message::RemoveMedia(id) => {
                 let before_count = self.media.len();
+                // Log video destruction before removing
+                if let Some(item) = self.media.iter().find(|m| m.id() == id) {
+                    if matches!(item, MediaItem::Video(_)) {
+                        crate::gst_logger::log_video_destroyed(id);
+                    }
+                }
                 self.media.retain(|m| m.id() != id);
                 if before_count != self.media.len() {
                     log::info!(
@@ -230,14 +253,20 @@ impl App {
             MediaItem::Photo(p) => p.hovered,
         });
 
+        // Only poll positions when there are videos
+        let has_videos = self.media.iter().any(|m| matches!(m, MediaItem::Video(_)));
+
+        let mut subscriptions = vec![event::listen().map(Message::EventOccurred)];
+
         if has_hovered_media {
-            Subscription::batch([
-                event::listen().map(Message::EventOccurred),
-                time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick),
-            ])
-        } else {
-            event::listen().map(Message::EventOccurred)
+            subscriptions.push(time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick));
         }
+
+        if has_videos {
+            subscriptions.push(crate::position_poller::position_update_subscription());
+        }
+
+        Subscription::batch(subscriptions)
     }
 
     /// Render the view.
