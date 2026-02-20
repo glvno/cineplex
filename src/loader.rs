@@ -176,6 +176,21 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
 
     app.media.push(MediaItem::Video(video_instance));
     app.next_id += 1;
+
+    // Restart bus watcher and position thread with updated video list
+    let videos: Vec<(usize, gstreamer::Pipeline)> = app
+        .media
+        .iter()
+        .filter_map(|m| match m {
+            crate::state::MediaItem::Video(v) => Some((v.id, v.video.pipeline())),
+            _ => None,
+        })
+        .collect();
+
+    if !videos.is_empty() {
+        log::info!("Restarting position thread with {} videos", videos.len());
+        app.position_thread_rx = Some(crate::position_thread::spawn_position_thread(videos));
+    }
     app.error = None;
     app.status = format!(
         "Video loaded: {}",

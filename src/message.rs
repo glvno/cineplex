@@ -13,6 +13,7 @@ pub enum Message {
     NewFrame(usize),
     ToggleMute(usize),
     PositionTick, // Periodic position update trigger
+    SeekComplete(usize), // Seek operation completed (video_id)
     // Shared messages (work for both videos and photos)
     RemoveMedia(usize),
     MediaHoverChanged(usize, bool),

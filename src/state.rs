@@ -1,5 +1,6 @@
 use iced::widget::image::Handle;
 use iced_video_player::Video;
+use std::sync::mpsc;
 use std::time::Instant;
 use tempfile::TempDir;
 
@@ -64,6 +65,7 @@ pub struct App {
     pub error: Option<String>,
     pub status: String,
     pub watchdog: crate::watchdog::Watchdog,
+    pub position_thread_rx: Option<mpsc::Receiver<crate::position_thread::PositionUpdate>>,
 }
 
 impl Default for App {
@@ -75,6 +77,7 @@ impl Default for App {
             error: None,
             status: "Drop media files here to load them".to_string(),
             watchdog: crate::watchdog::Watchdog::spawn(),
+            position_thread_rx: None,
         }
     }
 }

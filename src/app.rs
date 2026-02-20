@@ -23,6 +23,24 @@ impl App {
         // Signal watchdog that UI thread is alive
         self.watchdog.heartbeat();
 
+        // Check position thread for updates (non-blocking)
+        let mut position_updates = Vec::new();
+        if let Some(ref rx) = self.position_thread_rx {
+            while let Ok(update) = rx.try_recv() {
+                position_updates.push(update);
+            }
+        }
+
+        // Apply position updates
+        for update in position_updates {
+            if let Some(vid) = self.find_video_mut(update.video_id) {
+                // Only update position if user isn't dragging
+                if !vid.dragging {
+                    vid.position = update.position;
+                }
+            }
+        }
+
         match message {
             Message::BrowseFile => {
                 if let Some(path) = rfd::FileDialog::new()
@@ -123,7 +141,7 @@ impl App {
                     if secs.is_finite() && secs >= 0.0 {
                         vid.dragging = true;
                         vid.was_paused_before_drag = vid.video.paused();
-                        // Update position without pausing (reduces synchronous GStreamer calls)
+                        // Just update UI position while dragging
                         vid.position = secs;
                     }
                 }
@@ -131,18 +149,26 @@ impl App {
             Message::SeekRelease(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
                     vid.dragging = false;
-                    // Validate position is valid before seeking (must be finite, non-negative, and not NaN)
+                    // Validate position is valid before seeking
                     if vid.position.is_finite() && vid.position >= 0.0 {
-                        // Perform accurate seek without pause/unpause to reduce synchronous calls
+                        let target_pos = vid.position;
+                        log::info!(
+                            "Seeking: video_id={}, target={:.2}s",
+                            id,
+                            target_pos
+                        );
                         let _ = synchronized_seek(
                             id,
                             &mut vid.video,
-                            Duration::from_secs_f64(vid.position),
+                            Duration::from_secs_f64(target_pos),
                             true,
                         );
                     }
-                    // Note: Video continues playing during/after seek unless user paused it
                 }
+            }
+            Message::SeekComplete(id) => {
+                // No longer needed - seeks are processed synchronously
+                log::debug!("SeekComplete message received for video_id={} (ignored)", id);
             }
             Message::EndOfStream(id) => {
                 // GStreamer handles looping internally via video.set_looping(true)
@@ -170,19 +196,8 @@ impl App {
                 }
             }
             Message::PositionTick => {
-                // Update positions for all videos (unless user is dragging)
-                // This runs at 10Hz independent of frame rate
-                for item in &mut self.media {
-                    if let MediaItem::Video(vid) = item {
-                        if !vid.dragging {
-                            let thread_id = std::thread::current().id();
-                            let start = crate::gst_logger::log_position_query_start(vid.id, thread_id);
-                            let position = vid.video.position();
-                            crate::gst_logger::log_position_query_complete(vid.id, position, start);
-                            vid.position = position.as_secs_f64();
-                        }
-                    }
-                }
+                // Position updates now come from position_thread (background thread)
+                // This subscription is just kept for potential future use
             }
             Message::RemoveMedia(id) => {
                 let before_count = self.media.len();
@@ -248,7 +263,6 @@ impl App {
             MediaItem::Photo(p) => p.hovered,
         });
 
-        // Only poll positions when there are videos
         let has_videos = self.media.iter().any(|m| matches!(m, MediaItem::Video(_)));
 
         let mut subscriptions = vec![event::listen().map(Message::EventOccurred)];
@@ -259,6 +273,7 @@ impl App {
 
         if has_videos {
             subscriptions.push(crate::position_poller::position_update_subscription());
+            // Note: bus_monitor subscription removed - now using bus_watcher background thread
         }
 
         Subscription::batch(subscriptions)
