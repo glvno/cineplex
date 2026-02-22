@@ -78,11 +78,12 @@ impl App {
             }
             Message::TogglePause(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    // Use cached state instead of querying GStreamer (which can block)
+                    // Toggle pause state using cached value only
+                    // NEVER query video.paused() - it can deadlock on macOS CoreAudio
                     let new_paused = !vid.is_paused;
                     synchronized_set_paused(id, &mut vid.video, new_paused);
                     vid.is_paused = new_paused; // Update cache
-                    log::debug!("Video pause toggled: id={}, paused={}", id, new_paused);
+                    log::debug!("Pause toggled: video_id={}, paused={}", id, new_paused);
                 }
             }
             Message::ToggleLoop(id) => {
@@ -161,8 +162,8 @@ impl App {
             }
             Message::EndOfStream(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    log::warn!(
-                        "Video reached EOS: id={}, is_looping={}, position={:.2}s, duration={:.2}s",
+                    log::info!(
+                        "EOS: video_id={}, is_looping={}, position={:.2}s/{:.2}s",
                         id,
                         vid.is_looping,
                         vid.position,
@@ -172,7 +173,7 @@ impl App {
                     // Update duration to actual observed length if different
                     if vid.position > vid.duration && vid.position.is_finite() {
                         log::warn!(
-                            "Correcting duration for video {}: was {:.2}s, actual {:.2}s",
+                            "Duration fix: video_id={}, was={:.2}s, actual={:.2}s",
                             id,
                             vid.duration,
                             vid.position
@@ -180,15 +181,15 @@ impl App {
                         vid.duration = vid.position;
                     }
 
-                    // If looping is enabled, manually seek to start
-                    // (GStreamer's automatic looping seems unreliable for some videos)
+                    // If looping is enabled, seek to start
+                    // Keep it simple: just seek, don't pause/unpause (minimizes GStreamer calls)
                     if vid.is_looping {
-                        log::info!("Manually restarting loop for video_id={}", id);
+                        log::info!("Loop restart: video_id={}", id);
                         let _ = synchronized_seek(
                             id,
                             &mut vid.video,
                             Duration::from_secs(0),
-                            false, // Use non-accurate seek for speed
+                            false,
                         );
                         // Ensure it's playing
                         if vid.is_paused {
@@ -213,9 +214,15 @@ impl App {
                     }
                 }
 
-                // Apply position updates only if display value changed
+                let now = Instant::now();
+
+                // Apply position updates and detect stalls
                 for update in position_updates {
                     if let Some(vid) = self.find_video_mut(update.video_id) {
+                        // Track position updates for stall detection
+                        vid.last_position_update = now;
+                        vid.last_position_value = update.position;
+
                         // Only update position if user isn't dragging
                         if !vid.dragging {
                             // Only update if the displayed value changed (whole seconds)
@@ -231,12 +238,36 @@ impl App {
                                 let old_duration = vid.duration;
                                 vid.duration = (update.position * 1.1).max(vid.duration + 5.0); // Add 10% buffer or 5s, whichever is larger
                                 log::warn!(
-                                    "Video {} duration incorrect: cached={:.2}s, observed position={:.2}s, updating to={:.2}s",
+                                    "Duration correction: video_id={}, was={:.2}s, observed={:.2}s, now={:.2}s",
                                     update.video_id,
                                     old_duration,
                                     update.position,
                                     vid.duration
                                 );
+                            }
+                        }
+                    }
+                }
+
+                // Detect stalled videos (diagnostics only — no GStreamer recovery calls
+                // on the main thread, as calling set_paused on N videos simultaneously
+                // is what triggers the CoreAudio deadlock)
+                self.stall_check_counter += 1;
+                if self.stall_check_counter >= 10 {
+                    self.stall_check_counter = 0;
+
+                    for item in &self.media {
+                        if let MediaItem::Video(vid) = item {
+                            if !vid.is_paused && vid.is_looping {
+                                let time_since_update = now.duration_since(vid.last_position_update).as_secs_f64();
+                                if time_since_update > 2.0 {
+                                    log::warn!(
+                                        "Stalled video: video_id={}, position={:.2}s, last_update={:.1}s ago",
+                                        vid.id,
+                                        vid.last_position_value,
+                                        time_since_update
+                                    );
+                                }
                             }
                         }
                     }
@@ -289,7 +320,7 @@ impl App {
             }
             Message::UiFadeTick => {
                 // Just triggers fade animations - FPS now uses native_fps
-                // No state updates needed here, just triggers view() for fade recalculation
+                // No state validation - NEVER query GStreamer state on main thread (causes deadlocks)
             }
             Message::LoadInitialFiles(paths) => {
                 for path in paths {

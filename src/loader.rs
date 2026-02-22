@@ -187,6 +187,9 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         current_fps: 0.0,
         native_fps,
         last_mouse_activity: now,
+        // Stall detection
+        last_position_update: now,
+        last_position_value: 0.0,
     };
 
     crate::gst_logger::log_video_created(video_id, &video_path.display().to_string());

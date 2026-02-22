@@ -27,6 +27,9 @@ pub struct VideoInstance {
     pub native_fps: f64, // Native framerate of the video
     // UI fade tracking
     pub last_mouse_activity: Instant,
+    // Stall detection (indirect pause detection without querying GStreamer)
+    pub last_position_update: Instant,
+    pub last_position_value: f64,
 }
 
 /// Represents a single photo instance in the player.
@@ -71,6 +74,7 @@ pub struct App {
     pub status: String,
     pub watchdog: crate::watchdog::Watchdog,
     pub position_thread_rx: Option<mpsc::Receiver<crate::position_thread::PositionUpdate>>,
+    pub stall_check_counter: u32,
 }
 
 impl Default for App {
@@ -83,6 +87,7 @@ impl Default for App {
             status: "Drop media files here to load them".to_string(),
             watchdog: crate::watchdog::Watchdog::spawn(),
             position_thread_rx: None,
+            stall_check_counter: 0,
         }
     }
 }
