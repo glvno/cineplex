@@ -379,13 +379,19 @@ fn render_fullscreen_video<'a>(
     _app: &'a App,
     fullscreen_vid: &'a VideoInstance,
 ) -> Element<'a, Message> {
-    let video_player = VideoPlayer::new(&fullscreen_vid.video)
-        .on_end_of_stream(Message::EndOfStream(fullscreen_vid.id))
-        // Removed on_new_frame to prevent layout invalidation warnings
-        // FPS is now tracked via UiFadeTick subscription instead
-        .content_fit(iced::ContentFit::Contain)
-        .width(Length::Fill)
-        .height(Length::Fill);
+    let video_player = container(
+        VideoPlayer::new(&fullscreen_vid.video)
+            .on_end_of_stream(Message::EndOfStream(fullscreen_vid.id))
+            // Removed on_new_frame to prevent layout invalidation warnings
+            // FPS is now tracked via UiFadeTick subscription instead
+            .content_fit(iced::ContentFit::Contain)
+            .width(Length::Fill)
+            .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x(Length::Fill)
+    .center_y(Length::Fill);
 
     let opacity = compute_ui_opacity(fullscreen_vid.last_mouse_activity);
     let mut fullscreen_stack = stack![video_player];
@@ -512,10 +518,16 @@ fn render_fullscreen_video<'a>(
 
 /// Render the fullscreen view for a single photo.
 fn render_fullscreen_photo<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Element<'a, Message> {
-    let photo_view = image(&photo.handle)
-        .content_fit(iced::ContentFit::Contain)
-        .width(Length::Fill)
-        .height(Length::Fill);
+    let photo_view = container(
+        image(&photo.handle)
+            .content_fit(iced::ContentFit::Contain)
+            .width(Length::Fill)
+            .height(Length::Fill),
+    )
+    .width(Length::Fill)
+    .height(Length::Fill)
+    .center_x(Length::Fill)
+    .center_y(Length::Fill);
 
     let opacity = compute_ui_opacity(photo.last_mouse_activity);
     let mut fullscreen_stack = stack![photo_view];
