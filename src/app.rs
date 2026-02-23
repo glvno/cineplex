@@ -181,8 +181,9 @@ impl App {
                         vid.duration = vid.position;
                     }
 
-                    // If looping is enabled, seek to start
-                    // Keep it simple: just seek, don't pause/unpause (minimizes GStreamer calls)
+                    // If looping is enabled, seek to start and force playing state.
+                    // After EOS, GStreamer may not auto-resume after a seek, so we
+                    // always call set_paused(false) regardless of cached state.
                     if vid.is_looping {
                         log::info!("Loop restart: video_id={}", id);
                         let _ = synchronized_seek(
@@ -191,11 +192,8 @@ impl App {
                             Duration::from_secs(0),
                             false,
                         );
-                        // Ensure it's playing
-                        if vid.is_paused {
-                            synchronized_set_paused(id, &mut vid.video, false);
-                            vid.is_paused = false;
-                        }
+                        synchronized_set_paused(id, &mut vid.video, false);
+                        vid.is_paused = false;
                     }
                 }
             }
@@ -219,9 +217,13 @@ impl App {
                 // Apply position updates and detect stalls
                 for update in position_updates {
                     if let Some(vid) = self.find_video_mut(update.video_id) {
-                        // Track position updates for stall detection
-                        vid.last_position_update = now;
-                        vid.last_position_value = update.position;
+                        // Track when position actually *changes* for stall detection.
+                        // A stuck video still responds to position queries (same value),
+                        // so we must check the value, not just whether we got an update.
+                        if (update.position - vid.last_position_value).abs() > 0.01 {
+                            vid.last_position_update = now;
+                            vid.last_position_value = update.position;
+                        }
 
                         // Only update position if user isn't dragging
                         if !vid.dragging {
@@ -249,26 +251,45 @@ impl App {
                     }
                 }
 
-                // Detect stalled videos (diagnostics only — no GStreamer recovery calls
-                // on the main thread, as calling set_paused on N videos simultaneously
-                // is what triggers the CoreAudio deadlock)
+                // Detect stalled videos and recover ONE per cycle (every ~1s).
+                // Recovering all at once triggers CoreAudio deadlock; one at a time is safe.
                 self.stall_check_counter += 1;
                 if self.stall_check_counter >= 10 {
                     self.stall_check_counter = 0;
 
+                    // Find first stalled video and recover it
+                    let mut stalled_id = None;
                     for item in &self.media {
                         if let MediaItem::Video(vid) = item {
                             if !vid.is_paused && vid.is_looping {
                                 let time_since_update = now.duration_since(vid.last_position_update).as_secs_f64();
-                                if time_since_update > 2.0 {
+                                if time_since_update > 3.0 {
                                     log::warn!(
                                         "Stalled video: video_id={}, position={:.2}s, last_update={:.1}s ago",
                                         vid.id,
                                         vid.last_position_value,
                                         time_since_update
                                     );
+                                    stalled_id = Some(vid.id);
+                                    break; // Only recover one per cycle
                                 }
                             }
+                        }
+                    }
+
+                    if let Some(id) = stalled_id {
+                        if let Some(vid) = self.find_video_mut(id) {
+                            log::warn!("Recovering stalled video_id={}", id);
+                            // Seek to current position and force playing state,
+                            // same approach as loop restart
+                            let pos = vid.last_position_value;
+                            let _ = synchronized_seek(
+                                id,
+                                &mut vid.video,
+                                Duration::from_secs_f64(pos),
+                                false,
+                            );
+                            synchronized_set_paused(id, &mut vid.video, false);
                         }
                     }
                 }

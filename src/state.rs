@@ -27,7 +27,7 @@ pub struct VideoInstance {
     pub native_fps: f64, // Native framerate of the video
     // UI fade tracking
     pub last_mouse_activity: Instant,
-    // Stall detection (indirect pause detection without querying GStreamer)
+    // Stall detection: tracks when position last *changed* value, not just when queried
     pub last_position_update: Instant,
     pub last_position_value: f64,
 }
