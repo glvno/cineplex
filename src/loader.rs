@@ -251,6 +251,11 @@ fn create_video_from_pipeline(pipeline_str: &str) -> Result<Video, Box<dyn std::
         .downcast::<gst_app::AppSink>()
         .map_err(|_| "Failed to cast to AppSink")?;
 
+    // Set mute/volume on the playbin BEFORE from_gst_pipeline starts playback,
+    // otherwise audio briefly plays when loading many videos at once.
+    pipeline.set_property("mute", true);
+    pipeline.set_property("volume", 0.0f64);
+
     let mut video = Video::from_gst_pipeline(pipeline, video_sink, None)?;
     video.set_muted(true);
     video.set_volume(0.0);
