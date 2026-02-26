@@ -2,7 +2,6 @@ use iced::Event;
 use std::path::PathBuf;
 
 #[derive(Clone, Debug)]
-#[allow(dead_code)]
 pub enum Message {
     // Video-specific messages
     TogglePause(usize),
@@ -10,10 +9,8 @@ pub enum Message {
     Seek(usize, f64),
     SeekRelease(usize),
     EndOfStream(usize),
-    NewFrame(usize),
     ToggleMute(usize),
-    PositionTick, // Periodic position update trigger
-    SeekComplete(usize), // Seek operation completed (video_id)
+    PositionTick,
     // Shared messages (work for both videos and photos)
     RemoveMedia(usize),
     MediaHoverChanged(usize, bool),
@@ -26,7 +23,6 @@ pub enum Message {
     DecreaseColumns,
     // File loading
     BrowseFile,
-    FileDropped(PathBuf),
     EventOccurred(Event),
     LoadInitialFiles(Vec<PathBuf>),
 }

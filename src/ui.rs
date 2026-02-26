@@ -3,7 +3,7 @@ use iced::widget::{
     button, center, column, container, image, mouse_area, row, slider, stack, text,
 };
 use iced::{alignment, Color, Element, Length, Theme};
-use iced_video_player::{Video, VideoPlayer};
+use iced_video_player::VideoPlayer;
 use std::time::Instant;
 
 use crate::message::Message;
@@ -33,45 +33,9 @@ fn compute_ui_opacity(last_mouse_activity: Instant) -> f32 {
     (raw_opacity * 10.0).round() / 10.0
 }
 
-/// Get the safe duration of a video, handling invalid values.
-/// DEPRECATED: Use vid.duration instead to avoid blocking GStreamer queries.
-/// This function is kept for compatibility but should not be used.
-#[allow(dead_code)]
-pub fn safe_duration(video: &Video) -> f64 {
-    let duration = video.duration().as_secs_f64();
-    if duration.is_finite() && duration > 0.0 {
-        duration
-    } else {
-        1.0 // Default to 1 second if invalid (prevents slider from breaking)
-    }
-}
-
 /// Format FPS for display.
-pub fn get_fps_display(fps: f64) -> String {
+fn get_fps_display(fps: f64) -> String {
     format!("{:.1} FPS", fps)
-}
-
-/// Get the color for FPS display based on performance.
-pub fn get_fps_color(current_fps: f64, native_fps: f64) -> Color {
-    // Color based on performance relative to native framerate
-    // Green: within 5% of native (excellent)
-    // Yellow: 85-95% of native (good)
-    // Orange: 70-85% of native (acceptable)
-    // Red: below 70% of native (poor)
-
-    let threshold_excellent = native_fps * 0.95;
-    let threshold_good = native_fps * 0.85;
-    let threshold_acceptable = native_fps * 0.70;
-
-    if current_fps >= threshold_excellent {
-        Color::from_rgb8(0, 255, 0) // Green - excellent (95%+)
-    } else if current_fps >= threshold_good {
-        Color::from_rgb8(255, 255, 0) // Yellow - good (85-95%)
-    } else if current_fps >= threshold_acceptable {
-        Color::from_rgb8(255, 165, 0) // Orange - acceptable (70-85%)
-    } else {
-        Color::from_rgb8(255, 0, 0) // Red - poor (<70%)
-    }
 }
 
 /// Create a media cell (routes to video or photo cell based on type).

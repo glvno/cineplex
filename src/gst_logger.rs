@@ -7,39 +7,20 @@ use std::time::{Duration, Instant};
 use std::thread::ThreadId;
 
 /// Log categories for filtering
-#[derive(Debug, Clone, Copy)]
-pub enum LogCategory {
-    StateChange,
+enum LogCategory {
     PositionQuery,
     Seek,
     Pause,
-    Audio,
-    Message,
 }
 
 impl LogCategory {
     fn as_str(&self) -> &'static str {
         match self {
-            LogCategory::StateChange => "STATE_CHANGE",
             LogCategory::PositionQuery => "POSITION_QUERY",
             LogCategory::Seek => "SEEK",
             LogCategory::Pause => "PAUSE",
-            LogCategory::Audio => "AUDIO",
-            LogCategory::Message => "MESSAGE",
         }
     }
-}
-
-/// Log a state change operation
-pub fn log_state_change(video_id: usize, from: &str, to: &str, thread_id: ThreadId) {
-    log::debug!(
-        "[{}] Video {} state change: {} -> {} (thread: {:?})",
-        LogCategory::StateChange.as_str(),
-        video_id,
-        from,
-        to,
-        thread_id
-    );
 }
 
 /// Log the start of a position query
@@ -95,38 +76,6 @@ pub fn log_seek_start(video_id: usize, target: Duration, accurate: bool) -> Inst
         accurate
     );
     Instant::now()
-}
-
-/// Log the completion of a seek operation
-pub fn log_seek_complete(video_id: usize, actual: Duration, start: Instant) {
-    let elapsed = start.elapsed();
-    let elapsed_ms = elapsed.as_millis();
-
-    if elapsed_ms > 2000 {
-        log::error!(
-            "[{}] Video {} seek DEADLOCK SUSPECTED: {}ms, position={}s",
-            LogCategory::Seek.as_str(),
-            video_id,
-            elapsed_ms,
-            actual.as_secs_f64()
-        );
-    } else if elapsed_ms > 1000 {
-        log::warn!(
-            "[{}] Video {} seek SLOW: {}ms, position={}s",
-            LogCategory::Seek.as_str(),
-            video_id,
-            elapsed_ms,
-            actual.as_secs_f64()
-        );
-    } else {
-        log::info!(
-            "[{}] Video {} seek COMPLETE: {}ms, position={}s",
-            LogCategory::Seek.as_str(),
-            video_id,
-            elapsed_ms,
-            actual.as_secs_f64()
-        );
-    }
 }
 
 /// Log the completion of a seek operation without querying position (to avoid blocking)
@@ -211,84 +160,6 @@ pub fn log_pause_toggle_complete(video_id: usize, paused: bool, start: Instant) 
             paused,
             elapsed_ms
         );
-    }
-}
-
-/// Log a message handler entry
-pub fn log_message_handler(message_type: &str) -> Instant {
-    log::trace!(
-        "[{}] Handling message: {}",
-        LogCategory::Message.as_str(),
-        message_type
-    );
-    Instant::now()
-}
-
-/// Log a message handler completion
-pub fn log_message_handler_complete(message_type: &str, start: Instant) {
-    let elapsed = start.elapsed();
-    let elapsed_ms = elapsed.as_millis();
-
-    if elapsed_ms > 100 {
-        log::warn!(
-            "[{}] Message handler SLOW: {} took {}ms",
-            LogCategory::Message.as_str(),
-            message_type,
-            elapsed_ms
-        );
-    } else if elapsed_ms > 16 {
-        log::debug!(
-            "[{}] Message handler: {} took {}ms",
-            LogCategory::Message.as_str(),
-            message_type,
-            elapsed_ms
-        );
-    }
-}
-
-/// Generic operation timing wrapper
-pub fn with_timing<F, R>(
-    operation_name: &str,
-    warning_threshold_ms: u64,
-    f: F,
-) -> R
-where
-    F: FnOnce() -> R,
-{
-    let start = Instant::now();
-    let result = f();
-    let elapsed = start.elapsed();
-    let elapsed_ms = elapsed.as_millis() as u64;
-
-    if elapsed_ms > warning_threshold_ms {
-        log::warn!(
-            "Operation '{}' took {}ms (threshold: {}ms)",
-            operation_name,
-            elapsed_ms,
-            warning_threshold_ms
-        );
-    }
-
-    result
-}
-
-/// Check if an operation exceeded a timeout threshold
-pub fn check_timeout(
-    operation_name: &str,
-    start: Instant,
-    timeout_ms: u64,
-) -> bool {
-    let elapsed_ms = start.elapsed().as_millis() as u64;
-    if elapsed_ms > timeout_ms {
-        log::warn!(
-            "POTENTIAL DEADLOCK: {} took {}ms (timeout: {}ms)",
-            operation_name,
-            elapsed_ms,
-            timeout_ms
-        );
-        true
-    } else {
-        false
     }
 }
 

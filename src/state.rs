@@ -17,13 +17,8 @@ pub struct VideoInstance {
     pub is_paused: bool,
     pub is_looping: bool,
     pub is_muted: bool,
-    pub looping_enabled: bool, // Legacy field, use is_looping instead
     pub fullscreen: bool,
     pub _temp_dir: Option<TempDir>,
-    // Framerate monitoring
-    pub frame_count: u64,
-    pub last_fps_time: Instant,
-    pub current_fps: f64,
     pub native_fps: f64, // Native framerate of the video
     // UI fade tracking
     pub last_mouse_activity: Instant,

@@ -39,9 +39,6 @@ impl App {
                     loader::load_media_from_path(self, path);
                 }
             }
-            Message::FileDropped(path) => {
-                loader::load_media_from_path(self, path);
-            }
             Message::EventOccurred(event) => match event {
                 iced::Event::Window(iced::window::Event::FileDropped(path)) => {
                     loader::load_media_from_path(self, path);
@@ -91,8 +88,7 @@ impl App {
                     // Use cached state instead of querying GStreamer (which can block)
                     let new_looping = !vid.is_looping;
                     vid.video.set_looping(new_looping);
-                    vid.is_looping = new_looping; // Update cache
-                    vid.looping_enabled = new_looping; // Update legacy field
+                    vid.is_looping = new_looping;
                     log::debug!(
                         "Video looping toggled: id={}, looping={}",
                         id,
@@ -156,10 +152,6 @@ impl App {
                     }
                 }
             }
-            Message::SeekComplete(id) => {
-                // No longer needed - seeks are processed synchronously
-                log::debug!("SeekComplete message received for video_id={} (ignored)", id);
-            }
             Message::EndOfStream(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
                     log::info!(
@@ -196,11 +188,6 @@ impl App {
                         vid.is_paused = false;
                     }
                 }
-            }
-            Message::NewFrame(_id) => {
-                // No longer used - removed on_new_frame callback to prevent
-                // layout invalidation warnings caused by excessive view() calls
-                // FPS is now displayed using native_fps instead of calculated FPS
             }
             Message::PositionTick => {
                 // Process position updates from background thread

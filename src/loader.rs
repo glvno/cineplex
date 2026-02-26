@@ -179,12 +179,8 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         is_paused: false,  // Videos start playing
         is_looping: true,  // Looping enabled by default
         is_muted: true,    // Muted by default
-        looping_enabled: true, // Legacy field
         fullscreen: false,
         _temp_dir: None,
-        frame_count: 0,
-        last_fps_time: now,
-        current_fps: 0.0,
         native_fps,
         last_mouse_activity: now,
         // Stall detection
