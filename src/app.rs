@@ -10,6 +10,20 @@ use crate::sync::{synchronized_seek, synchronized_set_paused};
 use crate::ui;
 
 impl App {
+    /// Returns the ID of the keyboard shortcut target:
+    /// - In fullscreen mode: the fullscreen media's ID
+    /// - In grid mode: the hovered media's ID (if any)
+    fn shortcut_target_id(&self) -> Option<usize> {
+        if let Some(item) = self.media.iter().find(|m| m.is_fullscreen()) {
+            return Some(item.id());
+        }
+        self.media.iter().find_map(|m| match m {
+            MediaItem::Video(v) if v.hovered => Some(v.id),
+            MediaItem::Photo(p) if p.hovered => Some(p.id),
+            _ => None,
+        })
+    }
+
     /// Find a video by ID.
     fn find_video_mut(&mut self, id: usize) -> Option<&mut crate::state::VideoInstance> {
         self.media.iter_mut().find_map(|m| match m {
@@ -59,8 +73,55 @@ impl App {
                             self.grid_columns -= 1;
                         }
                     }
+                    iced::keyboard::key::Named::Space => {
+                        if let Some(id) = self.shortcut_target_id() {
+                            if let Some(vid) = self.find_video_mut(id) {
+                                let new_paused = !vid.is_paused;
+                                synchronized_set_paused(id, &mut vid.video, new_paused);
+                                vid.is_paused = new_paused;
+                            }
+                        }
+                    }
                     _ => {}
                 },
+                iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
+                    key: iced::keyboard::Key::Character(ch),
+                    ..
+                }) => {
+                    if let Some(id) = self.shortcut_target_id() {
+                        match ch.as_str() {
+                            "f" => {
+                                if let Some(item) = self.media.iter_mut().find(|m| m.id() == id) {
+                                    match item {
+                                        MediaItem::Video(v) => v.fullscreen = !v.fullscreen,
+                                        MediaItem::Photo(p) => p.fullscreen = !p.fullscreen,
+                                    }
+                                }
+                            }
+                            "m" => {
+                                if let Some(vid) = self.find_video_mut(id) {
+                                    let new_muted = !vid.is_muted;
+                                    if new_muted {
+                                        vid.video.set_volume(0.0);
+                                        vid.video.set_muted(true);
+                                    } else {
+                                        vid.video.set_volume(1.0);
+                                        vid.video.set_muted(false);
+                                    }
+                                    vid.is_muted = new_muted;
+                                }
+                            }
+                            "l" => {
+                                if let Some(vid) = self.find_video_mut(id) {
+                                    let new_looping = !vid.is_looping;
+                                    vid.video.set_looping(new_looping);
+                                    vid.is_looping = new_looping;
+                                }
+                            }
+                            _ => {}
+                        }
+                    }
+                }
                 _ => {}
             },
             Message::IncreaseColumns => {
