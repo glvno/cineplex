@@ -122,6 +122,32 @@ impl App {
                         }
                     }
                 }
+                iced::Event::Mouse(iced::mouse::Event::ButtonReleased(
+                    iced::mouse::Button::Left,
+                )) => {
+                    if let Some(source_id) = self.drag_source_id.take() {
+                        if let Some((target_id, insert_before)) = self.drag_target.take() {
+                            // Find indices by ID
+                            let source_idx = self.media.iter().position(|m| m.id() == source_id);
+                            let target_idx = self.media.iter().position(|m| m.id() == target_id);
+                            if let (Some(si), Some(ti)) = (source_idx, target_idx) {
+                                let item = self.media.remove(si);
+                                let adjusted = if si < ti { ti - 1 } else { ti };
+                                let insert_idx = if insert_before {
+                                    adjusted
+                                } else {
+                                    adjusted + 1
+                                };
+                                let insert_idx = insert_idx.min(self.media.len());
+                                self.media.insert(insert_idx, item);
+                            }
+                        }
+                    }
+                    self.drag_target = None;
+                }
+                iced::Event::Window(iced::window::Event::Resized(size)) => {
+                    self.window_width = size.width;
+                }
                 _ => {}
             },
             Message::IncreaseColumns => {
@@ -378,12 +404,27 @@ impl App {
                     }
                 }
             }
-            Message::MouseMoved(id) => {
+            Message::DragStart(id) => {
+                self.drag_source_id = Some(id);
+                self.drag_target = None;
+            }
+            Message::MouseMoved(id, point) => {
+                // Always update mouse activity for UI fade
                 if let Some(item) = self.media.iter_mut().find(|m| m.id() == id) {
                     let now = Instant::now();
                     match item {
                         MediaItem::Video(v) => v.last_mouse_activity = now,
                         MediaItem::Photo(p) => p.last_mouse_activity = now,
+                    }
+                }
+                // Update drag target if dragging over a different cell
+                if let Some(source_id) = self.drag_source_id {
+                    if id != source_id {
+                        let cell_width = self.window_width / self.grid_columns as f32;
+                        let insert_before = point.x < cell_width / 2.0;
+                        self.drag_target = Some((id, insert_before));
+                    } else {
+                        self.drag_target = None;
                     }
                 }
             }

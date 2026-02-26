@@ -38,6 +38,77 @@ fn get_fps_display(fps: f64) -> String {
     format!("{:.1} FPS", fps)
 }
 
+/// Wrap a media cell with drag visual feedback (dim source, insertion bar on target).
+fn wrap_drag_cell<'a>(
+    cell: Element<'a, Message>,
+    is_drag_source: bool,
+    drag_target_info: Option<(usize, bool)>,
+) -> Element<'a, Message> {
+    if !is_drag_source && drag_target_info.is_none() {
+        return container(cell)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into();
+    }
+
+    let opacity = if is_drag_source { 0.4 } else { 1.0 };
+
+    let mut layers = stack![
+        container(cell)
+            .width(Length::Fill)
+            .height(Length::Fill)
+    ];
+
+    // Dim overlay for drag source
+    if is_drag_source {
+        layers = layers.push(
+            container("")
+                .width(Length::Fill)
+                .height(Length::Fill)
+                .style(move |_theme: &Theme| container::Style {
+                    background: Some(Color::from_rgba(0.0, 0.0, 0.0, 1.0 - opacity).into()),
+                    ..Default::default()
+                }),
+        );
+    }
+
+    // Insertion bar for drag target
+    if let Some((_tid, insert_before)) = drag_target_info {
+        let bar = container("")
+            .width(Length::Fixed(4.0))
+            .height(Length::Fill)
+            .style(move |_theme: &Theme| container::Style {
+                background: Some(Color::from_rgba(0.2, 0.6, 1.0, 0.9).into()),
+                ..Default::default()
+            });
+
+        let bar_row = if insert_before {
+            // Bar on left edge
+            row![
+                bar,
+                container("").width(Length::Fill),
+            ]
+        } else {
+            // Bar on right edge
+            row![
+                container("").width(Length::Fill),
+                bar,
+            ]
+        };
+
+        layers = layers.push(
+            container(bar_row)
+                .width(Length::Fill)
+                .height(Length::Fill),
+        );
+    }
+
+    container(layers)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
+}
+
 /// Create a media cell (routes to video or photo cell based on type).
 pub fn create_media_cell<'a>(app: &'a App, item: &'a MediaItem) -> Element<'a, Message> {
     match item {
@@ -47,7 +118,7 @@ pub fn create_media_cell<'a>(app: &'a App, item: &'a MediaItem) -> Element<'a, M
 }
 
 /// Create a video cell with player and overlay controls.
-pub fn create_video_cell<'a>(_app: &'a App, vid: &'a VideoInstance) -> Element<'a, Message> {
+pub fn create_video_cell<'a>(app: &'a App, vid: &'a VideoInstance) -> Element<'a, Message> {
     let video_player = container(
         VideoPlayer::new(&vid.video)
             .on_end_of_stream(Message::EndOfStream(vid.id)),
@@ -70,15 +141,21 @@ pub fn create_video_cell<'a>(_app: &'a App, vid: &'a VideoInstance) -> Element<'
         }
     }
 
-    mouse_area(stack_content)
+    // Wrap in a container for drag visual feedback
+    let is_drag_source = app.drag_source_id == Some(vid.id);
+    let drag_target_info = app.drag_target.filter(|(tid, _)| *tid == vid.id);
+
+    let cell = mouse_area(stack_content)
         .on_enter(Message::MediaHoverChanged(vid.id, true))
         .on_exit(Message::MediaHoverChanged(vid.id, false))
-        .on_move(move |_| Message::MouseMoved(vid.id))
-        .into()
+        .on_press(Message::DragStart(vid.id))
+        .on_move(move |point| Message::MouseMoved(vid.id, point));
+
+    wrap_drag_cell(cell.into(), is_drag_source, drag_target_info)
 }
 
 /// Create a photo cell with image and overlay controls.
-pub fn create_photo_cell<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Element<'a, Message> {
+pub fn create_photo_cell<'a>(app: &'a App, photo: &'a PhotoInstance) -> Element<'a, Message> {
     let photo_view = container(image(&photo.handle).content_fit(iced::ContentFit::Contain))
         .width(Length::Fill)
         .height(Length::Fill)
@@ -96,11 +173,16 @@ pub fn create_photo_cell<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Element
         }
     }
 
-    mouse_area(stack_content)
+    let is_drag_source = app.drag_source_id == Some(photo.id);
+    let drag_target_info = app.drag_target.filter(|(tid, _)| *tid == photo.id);
+
+    let cell = mouse_area(stack_content)
         .on_enter(Message::MediaHoverChanged(photo.id, true))
         .on_exit(Message::MediaHoverChanged(photo.id, false))
-        .on_move(move |_| Message::MouseMoved(photo.id))
-        .into()
+        .on_press(Message::DragStart(photo.id))
+        .on_move(move |point| Message::MouseMoved(photo.id, point));
+
+    wrap_drag_cell(cell.into(), is_drag_source, drag_target_info)
 }
 
 /// Build the overlay controls for a photo.
@@ -476,7 +558,7 @@ fn render_fullscreen_video<'a>(
     mouse_area(fullscreen_stack)
         .on_enter(Message::MediaHoverChanged(fullscreen_vid.id, true))
         .on_exit(Message::MediaHoverChanged(fullscreen_vid.id, false))
-        .on_move(move |_| Message::MouseMoved(fullscreen_vid.id))
+        .on_move(move |point| Message::MouseMoved(fullscreen_vid.id, point))
         .into()
 }
 
@@ -551,7 +633,7 @@ fn render_fullscreen_photo<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Eleme
     mouse_area(fullscreen_stack)
         .on_enter(Message::MediaHoverChanged(photo.id, true))
         .on_exit(Message::MediaHoverChanged(photo.id, false))
-        .on_move(move |_| Message::MouseMoved(photo.id))
+        .on_move(move |point| Message::MouseMoved(photo.id, point))
         .into()
 }
 

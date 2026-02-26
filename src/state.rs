@@ -70,6 +70,10 @@ pub struct App {
     pub watchdog: crate::watchdog::Watchdog,
     pub position_thread_rx: Option<mpsc::Receiver<crate::position_thread::PositionUpdate>>,
     pub stall_check_counter: u32,
+    // Drag-to-reorder state
+    pub drag_source_id: Option<usize>,
+    pub drag_target: Option<(usize, bool)>, // (target cell id, insert_before)
+    pub window_width: f32,
 }
 
 impl Default for App {
@@ -83,6 +87,9 @@ impl Default for App {
             watchdog: crate::watchdog::Watchdog::spawn(),
             position_thread_rx: None,
             stall_check_counter: 0,
+            drag_source_id: None,
+            drag_target: None,
+            window_width: 800.0,
         }
     }
 }

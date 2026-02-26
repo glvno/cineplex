@@ -14,7 +14,8 @@ pub enum Message {
     // Shared messages (work for both videos and photos)
     RemoveMedia(usize),
     MediaHoverChanged(usize, bool),
-    MouseMoved(usize),
+    MouseMoved(usize, iced::Point),
+    DragStart(usize),
     ToggleFullscreen(usize),
     // UI fade timer
     UiFadeTick,
