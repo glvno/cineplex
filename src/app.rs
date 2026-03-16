@@ -1,3 +1,5 @@
+use gstreamer as gst;
+use gstreamer::prelude::*;
 use iced::event;
 use iced::time;
 use iced::{Element, Subscription};
@@ -8,6 +10,82 @@ use crate::message::Message;
 use crate::state::{App, MediaItem};
 use crate::sync::{synchronized_seek, synchronized_set_paused};
 use crate::ui;
+
+/// Swap audio sink between fakesink (muted) and autoaudiosink (unmuted).
+/// Videos start with fakesink to avoid CoreAudio mutex contention.
+/// On unmute, we transition through Ready state to swap in a real audio sink.
+fn swap_audio_sink(vid: &mut crate::state::VideoInstance, to_muted: bool) {
+    let pipeline = vid.video.pipeline();
+    let position = vid.position;
+
+    log::info!(
+        "Audio sink swap: video_id={}, to_muted={}, pos={:.2}s",
+        vid.id,
+        to_muted,
+        position
+    );
+
+    // Transition to Ready to allow audio sink property change
+    if let Err(e) = pipeline.set_state(gst::State::Ready) {
+        log::error!(
+            "Audio swap failed (Ready): video_id={}, {:?}",
+            vid.id,
+            e
+        );
+        return;
+    }
+
+    if to_muted {
+        let fakesink = gst::ElementFactory::make("fakesink")
+            .build()
+            .expect("fakesink");
+        pipeline.set_property("audio-sink", &fakesink);
+        pipeline.set_property("mute", true);
+        pipeline.set_property("volume", 0.0f64);
+    } else {
+        let real_sink = gst::ElementFactory::make("autoaudiosink")
+            .build()
+            .expect("autoaudiosink");
+        pipeline.set_property("audio-sink", &real_sink);
+        pipeline.set_property("mute", false);
+        pipeline.set_property("volume", 1.0f64);
+    }
+
+    // Resume playback
+    if let Err(e) = pipeline.set_state(gst::State::Playing) {
+        log::error!(
+            "Audio swap failed (Playing): video_id={}, {:?}",
+            vid.id,
+            e
+        );
+        return;
+    }
+
+    // When unmuting, wait for real audio sink to initialize
+    if !to_muted {
+        let _ = pipeline.state(gst::ClockTime::from_seconds(2));
+    }
+
+    // Restore internal state lost during pipeline state transition
+    vid.video.set_looping(vid.is_looping);
+    if vid.is_paused {
+        vid.video.set_paused(true);
+    }
+
+    // Seek back to where we were
+    if position > 0.0 && position.is_finite() {
+        let _ = vid
+            .video
+            .seek(std::time::Duration::from_secs_f64(position), false);
+    }
+
+    vid.is_muted = to_muted;
+    log::info!(
+        "Audio sink swap complete: video_id={}, muted={}",
+        vid.id,
+        to_muted
+    );
+}
 
 impl App {
     /// Returns the ID of the keyboard shortcut target:
@@ -109,14 +187,7 @@ impl App {
                             "m" => {
                                 if let Some(vid) = self.find_video_mut(id) {
                                     let new_muted = !vid.is_muted;
-                                    if new_muted {
-                                        vid.video.set_volume(0.0);
-                                        vid.video.set_muted(true);
-                                    } else {
-                                        vid.video.set_volume(1.0);
-                                        vid.video.set_muted(false);
-                                    }
-                                    vid.is_muted = new_muted;
+                                    swap_audio_sink(vid, new_muted);
                                 }
                             }
                             "l" => {
@@ -189,18 +260,8 @@ impl App {
             }
             Message::ToggleMute(id) => {
                 if let Some(vid) = self.find_video_mut(id) {
-                    // Use cached state instead of querying GStreamer (which can block)
                     let new_muted = !vid.is_muted;
-                    if new_muted {
-                        // Mute: set volume to 0 and mute
-                        vid.video.set_volume(0.0);
-                        vid.video.set_muted(true);
-                    } else {
-                        // Unmute: restore volume to 1.0 and unmute
-                        vid.video.set_volume(1.0);
-                        vid.video.set_muted(false);
-                    }
-                    vid.is_muted = new_muted; // Update cache
+                    swap_audio_sink(vid, new_muted);
                 }
             }
             Message::ToggleFullscreen(id) => {

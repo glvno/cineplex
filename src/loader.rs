@@ -72,8 +72,10 @@ fn load_video_on_thread(video_path: &PathBuf, video_id: usize) -> LoadResult {
 
     // Create pipeline with videoflip for automatic rotation based on metadata
     // videorate ensures a fixed framerate (needed for VFR content that reports 0 fps)
+    // audio-sink=fakesink prevents CoreAudio mutex contention for muted videos.
+    // When the user unmutes, the audio sink is swapped to autoaudiosink in app.rs.
     let pipeline_str = format!(
-        "playbin uri=\"{}\" \
+        "playbin uri=\"{}\" audio-sink=fakesink \
          video-sink=\"videoflip method=automatic ! videorate ! video/x-raw,framerate=30/1 ! \
          videoscale ! videoconvert ! \
          appsink name=iced_video drop=true caps=video/x-raw,format=NV12,pixel-aspect-ratio=1/1\"",
