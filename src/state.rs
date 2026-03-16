@@ -4,6 +4,13 @@ use std::sync::mpsc;
 use std::time::Instant;
 use tempfile::TempDir;
 
+/// Result of a background media loading operation.
+pub enum LoadResult {
+    Video(VideoInstance),
+    Photo(PhotoInstance),
+    Error(String),
+}
+
 /// Represents a single video instance in the player.
 pub struct VideoInstance {
     pub id: usize,
@@ -74,10 +81,15 @@ pub struct App {
     pub drag_source_id: Option<usize>,
     pub drag_target: Option<(usize, bool)>, // (target cell id, insert_before)
     pub window_width: f32,
+    // Background media loading
+    pub load_tx: mpsc::Sender<LoadResult>,
+    pub load_rx: mpsc::Receiver<LoadResult>,
+    pub loading_count: usize,
 }
 
 impl Default for App {
     fn default() -> Self {
+        let (load_tx, load_rx) = mpsc::channel();
         App {
             media: Vec::new(),
             next_id: 0,
@@ -90,6 +102,9 @@ impl Default for App {
             drag_source_id: None,
             drag_target: None,
             window_width: 800.0,
+            load_tx,
+            load_rx,
+            loading_count: 0,
         }
     }
 }

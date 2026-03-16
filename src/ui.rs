@@ -352,23 +352,35 @@ pub fn render_main_view(app: &App) -> Element<'_, Message> {
         .into();
     }
 
-    // Empty state
+    // Empty state (but might be loading)
     if app.media.is_empty() {
-        return center(
-            column![
-                text("Drag & Drop Media Here").size(48),
-                text("or click browse to load videos and photos").size(16),
-                button(text("[Browse Files]").size(18))
-                    .padding(10)
-                    .on_press(Message::BrowseFile),
-                text("").size(10),
-                text(app.status.clone()).size(12),
-            ]
-            .spacing(20),
-        )
-        .width(Length::Fill)
-        .height(Length::Fill)
-        .into();
+        let mut col = column![
+            text(if app.loading_count > 0 {
+                "Loading Media..."
+            } else {
+                "Drag & Drop Media Here"
+            })
+            .size(48),
+            text("or click browse to load videos and photos").size(16),
+            button(text("[Browse Files]").size(18))
+                .padding(10)
+                .on_press(Message::BrowseFile),
+            text("").size(10),
+            text(app.status.clone()).size(12),
+        ]
+        .spacing(20);
+        if app.loading_count > 0 {
+            col = col.push(
+                text(format!(
+                    "Loading {} file{}...",
+                    app.loading_count,
+                    if app.loading_count == 1 { "" } else { "s" }
+                ))
+                .size(16)
+                .color(Color::from_rgb(0.6, 0.8, 1.0)),
+            );
+        }
+        return center(col).width(Length::Fill).height(Length::Fill).into();
     }
 
     // Fullscreen mode
@@ -678,6 +690,19 @@ fn render_controls_bar<'a>(app: &'a App) -> Element<'a, Message> {
                 .on_press(Message::BrowseFile)
                 .padding(5),
             text(count_text).size(12),
+            {
+                if app.loading_count > 0 {
+                    text(format!(
+                        " | Loading {} file{}...",
+                        app.loading_count,
+                        if app.loading_count == 1 { "" } else { "s" }
+                    ))
+                    .size(12)
+                    .color(Color::from_rgb(0.6, 0.8, 1.0))
+                } else {
+                    text("").size(12)
+                }
+            },
         ]
         .spacing(10)
         .align_y(alignment::Vertical::Center),

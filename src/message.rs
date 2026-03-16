@@ -26,4 +26,5 @@ pub enum Message {
     BrowseFile,
     EventOccurred(Event),
     LoadInitialFiles(Vec<PathBuf>),
+    CheckLoadedMedia,
 }

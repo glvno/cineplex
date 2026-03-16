@@ -50,12 +50,20 @@ impl App {
                     )
                     .pick_file()
                 {
-                    loader::load_media_from_path(self, path);
+                    let id = self.next_id;
+                    self.next_id += 1;
+                    self.loading_count += 1;
+                    self.status = "Loading...".to_string();
+                    loader::load_media_async(self.load_tx.clone(), path, id);
                 }
             }
             Message::EventOccurred(event) => match event {
                 iced::Event::Window(iced::window::Event::FileDropped(path)) => {
-                    loader::load_media_from_path(self, path);
+                    let id = self.next_id;
+                    self.next_id += 1;
+                    self.loading_count += 1;
+                    self.status = "Loading...".to_string();
+                    loader::load_media_async(self.load_tx.clone(), path, id);
                 }
                 iced::Event::Keyboard(iced::keyboard::Event::KeyPressed {
                     key: iced::keyboard::Key::Named(key),
@@ -425,7 +433,73 @@ impl App {
             }
             Message::LoadInitialFiles(paths) => {
                 for path in paths {
-                    loader::load_media_from_path(self, path);
+                    let id = self.next_id;
+                    self.next_id += 1;
+                    self.loading_count += 1;
+                    loader::load_media_async(self.load_tx.clone(), path, id);
+                }
+                if self.loading_count > 0 {
+                    self.status = format!("Loading {} files...", self.loading_count);
+                }
+            }
+            Message::CheckLoadedMedia => {
+                while let Ok(result) = self.load_rx.try_recv() {
+                    self.loading_count = self.loading_count.saturating_sub(1);
+                    match result {
+                        crate::state::LoadResult::Video(video_instance) => {
+                            let vid_id = video_instance.id;
+                            let fps = video_instance.native_fps;
+                            self.media.push(MediaItem::Video(video_instance));
+                            log::info!(
+                                "Video ready: id={}, fps={}, total_media={}",
+                                vid_id,
+                                fps,
+                                self.media.len()
+                            );
+
+                            // Restart position thread with updated video list
+                            let videos: Vec<(usize, gstreamer::Pipeline)> = self
+                                .media
+                                .iter()
+                                .filter_map(|m| match m {
+                                    MediaItem::Video(v) => Some((v.id, v.video.pipeline())),
+                                    _ => None,
+                                })
+                                .collect();
+
+                            if !videos.is_empty() {
+                                log::info!(
+                                    "Restarting position thread with {} videos",
+                                    videos.len()
+                                );
+                                self.position_thread_rx =
+                                    Some(crate::position_thread::spawn_position_thread(videos));
+                            }
+                            self.error = None;
+                        }
+                        crate::state::LoadResult::Photo(photo_instance) => {
+                            let photo_id = photo_instance.id;
+                            let filename = photo_instance.filename.clone();
+                            self.media.push(MediaItem::Photo(photo_instance));
+                            log::info!(
+                                "Photo ready: id={}, name={}, total_media={}",
+                                photo_id,
+                                filename,
+                                self.media.len()
+                            );
+                            self.error = None;
+                        }
+                        crate::state::LoadResult::Error(e) => {
+                            log::error!("Media load error: {}", e);
+                            self.error = Some(e);
+                        }
+                    }
+                }
+
+                if self.loading_count > 0 {
+                    self.status = format!("Loading {} file{}...", self.loading_count, if self.loading_count == 1 { "" } else { "s" });
+                } else if !self.media.is_empty() {
+                    self.status = format!("{} media loaded", self.media.len());
                 }
             }
         }
@@ -452,6 +526,13 @@ impl App {
         if has_videos {
             subscriptions.push(crate::position_poller::position_update_subscription());
             // Note: bus_monitor subscription removed - now using bus_watcher background thread
+        }
+
+        // Poll for loaded media results when background loads are in-flight
+        if self.loading_count > 0 {
+            subscriptions.push(
+                time::every(Duration::from_millis(100)).map(|_| Message::CheckLoadedMedia),
+            );
         }
 
         Subscription::batch(subscriptions)

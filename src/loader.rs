@@ -6,9 +6,10 @@ use iced_video_player::Video;
 use image::{DynamicImage, ImageDecoder, ImageReader};
 use std::ffi::OsStr;
 use std::path::PathBuf;
+use std::sync::mpsc;
 use std::time::Instant;
 
-use crate::state::{App, MediaItem, PhotoInstance, VideoInstance};
+use crate::state::{LoadResult, PhotoInstance, VideoInstance};
 
 /// Supported video extensions (case-insensitive check performed separately).
 const VIDEO_EXTENSIONS: &[&str] = &["mov", "mp4", "m4v", "mkv", "avi", "webm"];
@@ -39,93 +40,34 @@ pub fn is_supported_media_file(path: &PathBuf) -> bool {
     is_video_file(path) || is_image_file(path)
 }
 
-/// Load a media file (video or photo) from a file path.
-pub fn load_media_from_path(app: &mut App, path: PathBuf) {
-    app.status = "Loading...".to_string();
-
-    match std::fs::metadata(&path) {
-        Ok(_) => {
-            if is_video_file(&path) {
-                load_direct_video(app, &path);
+/// Spawn a background thread to load a media file asynchronously.
+/// Results are sent back via the provided channel.
+pub fn load_media_async(tx: mpsc::Sender<LoadResult>, path: PathBuf, id: usize) {
+    std::thread::Builder::new()
+        .name(format!("media-loader-{}", id))
+        .spawn(move || {
+            let result = if is_video_file(&path) {
+                load_video_on_thread(&path, id)
             } else if is_image_file(&path) {
-                load_photo(app, &path);
+                load_photo_on_thread(&path, id)
             } else {
-                app.error = Some(format!(
+                LoadResult::Error(format!(
                     "Unsupported file type: {}",
                     path.extension()
                         .and_then(OsStr::to_str)
                         .unwrap_or("unknown")
-                ));
-            }
-        }
-        Err(e) => {
-            app.error = Some(format!("File not found: {}", e));
-        }
-    }
+                ))
+            };
+            let _ = tx.send(result);
+        })
+        .expect("Failed to spawn media loader thread");
 }
 
-/// Load a photo from a file path with proper EXIF orientation handling.
-fn load_photo(app: &mut App, photo_path: &PathBuf) {
-    let photo_id = app.next_id;
-    let filename = photo_path
-        .file_name()
-        .unwrap_or_default()
-        .to_string_lossy()
-        .to_string();
-
-    // Load image with EXIF orientation support
-    let handle = match load_image_with_orientation(photo_path) {
-        Ok(h) => h,
-        Err(e) => {
-            app.error = Some(format!("Failed to load image: {}", e));
-            return;
-        }
-    };
-
-    let photo_instance = PhotoInstance {
-        id: photo_id,
-        handle,
-        hovered: false,
-        fullscreen: false,
-        filename: filename.clone(),
-        last_mouse_activity: Instant::now(),
-    };
-
-    log::info!(
-        "Photo loaded: id={}, path={}, total_media={}",
-        photo_id,
-        photo_path.display(),
-        app.media.len() + 1
-    );
-
-    app.media.push(MediaItem::Photo(photo_instance));
-    app.next_id += 1;
-    app.error = None;
-    app.status = format!("Photo loaded: {}", filename);
-}
-
-/// Load an image file and apply EXIF orientation correction.
-fn load_image_with_orientation(path: &PathBuf) -> Result<Handle, Box<dyn std::error::Error>> {
-    let mut decoder = ImageReader::open(path)?.into_decoder()?;
-    let orientation = decoder.orientation()?;
-    let mut img = DynamicImage::from_decoder(decoder)?;
-    img.apply_orientation(orientation);
-
-    let rgba = img.to_rgba8();
-    let (width, height) = rgba.dimensions();
-    let pixels = rgba.into_raw();
-
-    Ok(Handle::from_rgba(width, height, pixels))
-}
-
-/// Load a video with automatic rotation correction from metadata.
-fn load_direct_video(app: &mut App, video_path: &PathBuf) {
+/// Load a video on a background thread, returning a LoadResult.
+fn load_video_on_thread(video_path: &PathBuf, video_id: usize) -> LoadResult {
     let url = match url::Url::from_file_path(video_path) {
         Ok(u) => u,
-        Err(_) => {
-            app.error = Some("Invalid video path".to_string());
-            return;
-        }
+        Err(_) => return LoadResult::Error("Invalid video path".to_string()),
     };
 
     // Create pipeline with videoflip for automatic rotation based on metadata
@@ -140,14 +82,10 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
 
     let video = match create_video_from_pipeline(&pipeline_str) {
         Ok(v) => v,
-        Err(e) => {
-            app.error = Some(format!("Failed to load video: {}", e));
-            return;
-        }
+        Err(e) => return LoadResult::Error(format!("Failed to load video: {}", e)),
     };
 
     let native_fps = video.framerate();
-    // Query duration once at load time to avoid blocking during UI rendering
     let duration = {
         let raw_duration = video.duration().as_secs_f64();
         log::info!(
@@ -163,11 +101,10 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
                 "Invalid duration for {}, defaulting to 1.0s",
                 video_path.file_name().unwrap_or_default().to_string_lossy()
             );
-            1.0 // Default to 1 second if invalid
+            1.0
         }
     };
     let now = Instant::now();
-    let video_id = app.next_id;
 
     let video_instance = VideoInstance {
         id: video_id,
@@ -177,50 +114,71 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         dragging: false,
         was_paused_before_drag: false,
         hovered: false,
-        // Cached GStreamer state - initialized to match loader settings
-        is_paused: false, // Videos start playing
-        is_looping: true, // Looping enabled by default
-        is_muted: true,   // Muted by default
+        is_paused: false,
+        is_looping: true,
+        is_muted: true,
         fullscreen: false,
         _temp_dir: None,
         native_fps,
         last_mouse_activity: now,
-        // Stall detection
         last_position_update: now,
         last_position_value: 0.0,
     };
 
     crate::gst_logger::log_video_created(video_id, &video_path.display().to_string());
     log::info!(
-        "Video loaded: id={}, path={}, fps={}, total_media={}",
+        "Video loaded (async): id={}, path={}, fps={}",
         video_id,
         video_path.display(),
         native_fps,
-        app.media.len() + 1
     );
 
-    app.media.push(MediaItem::Video(video_instance));
-    app.next_id += 1;
+    LoadResult::Video(video_instance)
+}
 
-    // Restart bus watcher and position thread with updated video list
-    let videos: Vec<(usize, gstreamer::Pipeline)> = app
-        .media
-        .iter()
-        .filter_map(|m| match m {
-            crate::state::MediaItem::Video(v) => Some((v.id, v.video.pipeline())),
-            _ => None,
-        })
-        .collect();
+/// Load a photo on a background thread, returning a LoadResult.
+fn load_photo_on_thread(photo_path: &PathBuf, photo_id: usize) -> LoadResult {
+    let filename = photo_path
+        .file_name()
+        .unwrap_or_default()
+        .to_string_lossy()
+        .to_string();
 
-    if !videos.is_empty() {
-        log::info!("Restarting position thread with {} videos", videos.len());
-        app.position_thread_rx = Some(crate::position_thread::spawn_position_thread(videos));
-    }
-    app.error = None;
-    app.status = format!(
-        "Video loaded: {}",
-        video_path.file_name().unwrap_or_default().to_string_lossy()
+    let handle = match load_image_with_orientation(photo_path) {
+        Ok(h) => h,
+        Err(e) => return LoadResult::Error(format!("Failed to load image: {}", e)),
+    };
+
+    let photo_instance = PhotoInstance {
+        id: photo_id,
+        handle,
+        hovered: false,
+        fullscreen: false,
+        filename: filename.clone(),
+        last_mouse_activity: Instant::now(),
+    };
+
+    log::info!(
+        "Photo loaded (async): id={}, path={}",
+        photo_id,
+        photo_path.display(),
     );
+
+    LoadResult::Photo(photo_instance)
+}
+
+/// Load an image file and apply EXIF orientation correction.
+fn load_image_with_orientation(path: &PathBuf) -> Result<Handle, Box<dyn std::error::Error>> {
+    let mut decoder = ImageReader::open(path)?.into_decoder()?;
+    let orientation = decoder.orientation()?;
+    let mut img = DynamicImage::from_decoder(decoder)?;
+    img.apply_orientation(orientation);
+
+    let rgba = img.to_rgba8();
+    let (width, height) = rgba.dimensions();
+    let pixels = rgba.into_raw();
+
+    Ok(Handle::from_rgba(width, height, pixels))
 }
 
 /// Create a Video from a custom GStreamer pipeline string.
