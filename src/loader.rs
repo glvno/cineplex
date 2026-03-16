@@ -14,7 +14,9 @@ use crate::state::{App, MediaItem, PhotoInstance, VideoInstance};
 const VIDEO_EXTENSIONS: &[&str] = &["mov", "mp4", "m4v", "mkv", "avi", "webm"];
 
 /// Supported image extensions (case-insensitive check performed separately).
-const IMAGE_EXTENSIONS: &[&str] = &["jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "tif", "heic", "heif"];
+const IMAGE_EXTENSIONS: &[&str] = &[
+    "jpg", "jpeg", "png", "gif", "bmp", "webp", "tiff", "tif", "heic", "heif",
+];
 
 /// Determine if a path is a video file.
 fn is_video_file(path: &PathBuf) -> bool {
@@ -176,9 +178,9 @@ fn load_direct_video(app: &mut App, video_path: &PathBuf) {
         was_paused_before_drag: false,
         hovered: false,
         // Cached GStreamer state - initialized to match loader settings
-        is_paused: false,  // Videos start playing
-        is_looping: true,  // Looping enabled by default
-        is_muted: true,    // Muted by default
+        is_paused: false, // Videos start playing
+        is_looping: true, // Looping enabled by default
+        is_muted: true,   // Muted by default
         fullscreen: false,
         _temp_dir: None,
         native_fps,

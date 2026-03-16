@@ -176,11 +176,7 @@ impl App {
                     let new_looping = !vid.is_looping;
                     vid.video.set_looping(new_looping);
                     vid.is_looping = new_looping;
-                    log::debug!(
-                        "Video looping toggled: id={}, looping={}",
-                        id,
-                        new_looping
-                    );
+                    log::debug!("Video looping toggled: id={}, looping={}", id, new_looping);
                 }
             }
             Message::ToggleMute(id) => {
@@ -225,11 +221,7 @@ impl App {
                     // Validate position is valid before seeking
                     if vid.position.is_finite() && vid.position >= 0.0 {
                         let target_pos = vid.position;
-                        log::info!(
-                            "Seeking: video_id={}, target={:.2}s",
-                            id,
-                            target_pos
-                        );
+                        log::info!("Seeking: video_id={}, target={:.2}s", id, target_pos);
                         let _ = synchronized_seek(
                             id,
                             &mut vid.video,
@@ -265,12 +257,8 @@ impl App {
                     // always call set_paused(false) regardless of cached state.
                     if vid.is_looping {
                         log::info!("Loop restart: video_id={}", id);
-                        let _ = synchronized_seek(
-                            id,
-                            &mut vid.video,
-                            Duration::from_secs(0),
-                            false,
-                        );
+                        let _ =
+                            synchronized_seek(id, &mut vid.video, Duration::from_secs(0), false);
                         synchronized_set_paused(id, &mut vid.video, false);
                         vid.is_paused = false;
                     }
@@ -304,7 +292,9 @@ impl App {
                             // Only update if the displayed value changed (whole seconds)
                             let old_display_pos = vid.position as u64;
                             let new_display_pos = update.position as u64;
-                            if old_display_pos != new_display_pos || (vid.position - update.position).abs() > 1.0 {
+                            if old_display_pos != new_display_pos
+                                || (vid.position - update.position).abs() > 1.0
+                            {
                                 vid.position = update.position;
                             }
 
@@ -336,7 +326,8 @@ impl App {
                     for item in &self.media {
                         if let MediaItem::Video(vid) = item {
                             if !vid.is_paused && vid.is_looping {
-                                let time_since_update = now.duration_since(vid.last_position_update).as_secs_f64();
+                                let time_since_update =
+                                    now.duration_since(vid.last_position_update).as_secs_f64();
                                 if time_since_update > 3.0 {
                                     log::warn!(
                                         "Stalled video: video_id={}, position={:.2}s, last_update={:.1}s ago",
@@ -454,7 +445,8 @@ impl App {
 
         // Always tick when there are videos (for FPS updates) or hovered media (for fade)
         if has_videos || has_hovered_media {
-            subscriptions.push(time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick));
+            subscriptions
+                .push(time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick));
         }
 
         if has_videos {

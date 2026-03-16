@@ -8,7 +8,7 @@ iced = { version = "0.14", features = ["image", "tokio"] }
 image = "0.25"
 iced_video_player = { git = "https://github.com/jazzfool/iced_video_player.git", branch = "master" }
 url = "2.5.7"
-tokio = { version = "1", features = ["rt", "process"] }
+tokio = { version = "1", features = ["full"] }
 futures = "0.3"
 tempfile = "3"
 rfd = "0.12"

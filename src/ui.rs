@@ -2,7 +2,7 @@ use iced::widget::text::Shaping;
 use iced::widget::{
     button, center, column, container, image, mouse_area, row, slider, stack, text,
 };
-use iced::{alignment, Color, Element, Length, Theme};
+use iced::{Color, Element, Length, Theme, alignment};
 use iced_video_player::VideoPlayer;
 use std::time::Instant;
 
@@ -53,11 +53,7 @@ fn wrap_drag_cell<'a>(
 
     let opacity = if is_drag_source { 0.4 } else { 1.0 };
 
-    let mut layers = stack![
-        container(cell)
-            .width(Length::Fill)
-            .height(Length::Fill)
-    ];
+    let mut layers = stack![container(cell).width(Length::Fill).height(Length::Fill)];
 
     // Dim overlay for drag source
     if is_drag_source {
@@ -84,23 +80,13 @@ fn wrap_drag_cell<'a>(
 
         let bar_row = if insert_before {
             // Bar on left edge
-            row![
-                bar,
-                container("").width(Length::Fill),
-            ]
+            row![bar, container("").width(Length::Fill),]
         } else {
             // Bar on right edge
-            row![
-                container("").width(Length::Fill),
-                bar,
-            ]
+            row![container("").width(Length::Fill), bar,]
         };
 
-        layers = layers.push(
-            container(bar_row)
-                .width(Length::Fill)
-                .height(Length::Fill),
-        );
+        layers = layers.push(container(bar_row).width(Length::Fill).height(Length::Fill));
     }
 
     container(layers)
@@ -120,10 +106,9 @@ pub fn create_media_cell<'a>(app: &'a App, item: &'a MediaItem) -> Element<'a, M
 /// Create a video cell with player and overlay controls.
 pub fn create_video_cell<'a>(app: &'a App, vid: &'a VideoInstance) -> Element<'a, Message> {
     let video_player = container(
-        VideoPlayer::new(&vid.video)
-            .on_end_of_stream(Message::EndOfStream(vid.id)),
-            // Removed on_new_frame to prevent layout invalidation warnings
-            // FPS is now tracked via UiFadeTick subscription instead
+        VideoPlayer::new(&vid.video).on_end_of_stream(Message::EndOfStream(vid.id)),
+        // Removed on_new_frame to prevent layout invalidation warnings
+        // FPS is now tracked via UiFadeTick subscription instead
     )
     .width(Length::Fill)
     .height(Length::Fill)
@@ -209,11 +194,17 @@ fn build_photo_overlay<'a>(photo: &'a PhotoInstance, opacity: f32) -> Element<'a
     .width(Length::Fill);
 
     let bottom_bar = container(
-        row![button(text(if photo.fullscreen { "V" } else { "F" }).size(12).color(text_color))
+        row![
+            button(
+                text(if photo.fullscreen { "V" } else { "F" })
+                    .size(12)
+                    .color(text_color)
+            )
             .on_press(Message::ToggleFullscreen(photo.id))
             .padding(8)
             .width(Length::Shrink)
-            .height(Length::Shrink),]
+            .height(Length::Shrink),
+        ]
         .spacing(5)
         .align_y(alignment::Vertical::Center)
         .padding(10),
@@ -224,14 +215,12 @@ fn build_photo_overlay<'a>(photo: &'a PhotoInstance, opacity: f32) -> Element<'a
     })
     .width(Length::Fill);
 
-    let overlay = container(
-        column![
-            top_bar,
-            // Center spacer (transparent)
-            container("").height(Length::Fill),
-            bottom_bar
-        ],
-    )
+    let overlay = container(column![
+        top_bar,
+        // Center spacer (transparent)
+        container("").height(Length::Fill),
+        bottom_bar
+    ])
     .width(Length::Fill)
     .height(Length::Fill);
 
@@ -279,26 +268,42 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
             .on_release(Message::SeekRelease(vid.id)),
             // Control buttons (use cached state to avoid blocking GStreamer queries)
             row![
-                button(text(if vid.is_paused { ">" } else { "||" }).size(12).color(text_color))
-                    .on_press(Message::TogglePause(vid.id))
-                    .padding(8)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink),
-                button(text(if vid.is_looping { "↻" } else { "→" }).size(12).color(text_color))
-                    .on_press(Message::ToggleLoop(vid.id))
-                    .padding(8)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink),
-                button(text(if vid.is_muted { "M" } else { "~" }).size(12).color(text_color))
-                    .on_press(Message::ToggleMute(vid.id))
-                    .padding(8)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink),
-                button(text(if vid.fullscreen { "V" } else { "F" }).size(12).color(text_color))
-                    .on_press(Message::ToggleFullscreen(vid.id))
-                    .padding(8)
-                    .width(Length::Shrink)
-                    .height(Length::Shrink),
+                button(
+                    text(if vid.is_paused { ">" } else { "||" })
+                        .size(12)
+                        .color(text_color)
+                )
+                .on_press(Message::TogglePause(vid.id))
+                .padding(8)
+                .width(Length::Shrink)
+                .height(Length::Shrink),
+                button(
+                    text(if vid.is_looping { "↻" } else { "→" })
+                        .size(12)
+                        .color(text_color)
+                )
+                .on_press(Message::ToggleLoop(vid.id))
+                .padding(8)
+                .width(Length::Shrink)
+                .height(Length::Shrink),
+                button(
+                    text(if vid.is_muted { "M" } else { "~" })
+                        .size(12)
+                        .color(text_color)
+                )
+                .on_press(Message::ToggleMute(vid.id))
+                .padding(8)
+                .width(Length::Shrink)
+                .height(Length::Shrink),
+                button(
+                    text(if vid.fullscreen { "V" } else { "F" })
+                        .size(12)
+                        .color(text_color)
+                )
+                .on_press(Message::ToggleFullscreen(vid.id))
+                .padding(8)
+                .width(Length::Shrink)
+                .height(Length::Shrink),
                 text(format!(
                     "{}:{:02}",
                     vid.position as u64 / 60,
@@ -320,14 +325,12 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
     })
     .width(Length::Fill);
 
-    let overlay = container(
-        column![
-            top_bar,
-            // Center spacer (transparent)
-            container("").height(Length::Fill),
-            bottom_bar
-        ],
-    )
+    let overlay = container(column![
+        top_bar,
+        // Center spacer (transparent)
+        container("").height(Length::Fill),
+        bottom_bar
+    ])
     .width(Length::Fill)
     .height(Length::Fill);
 
@@ -485,13 +488,9 @@ fn render_fullscreen_video<'a>(
                 // Control buttons (use cached state to avoid blocking GStreamer queries)
                 row![
                     button(
-                        text(if fullscreen_vid.is_paused {
-                            ">"
-                        } else {
-                            "||"
-                        })
-                        .size(12)
-                        .color(text_color)
+                        text(if fullscreen_vid.is_paused { ">" } else { "||" })
+                            .size(12)
+                            .color(text_color)
                     )
                     .on_press(Message::TogglePause(fullscreen_vid.id))
                     .padding(8)
@@ -510,11 +509,15 @@ fn render_fullscreen_video<'a>(
                     .padding(8)
                     .width(Length::Shrink)
                     .height(Length::Shrink),
-                    button(text(if fullscreen_vid.is_muted { "M" } else { "~" }).size(12).color(text_color))
-                        .on_press(Message::ToggleMute(fullscreen_vid.id))
-                        .padding(8)
-                        .width(Length::Shrink)
-                        .height(Length::Shrink),
+                    button(
+                        text(if fullscreen_vid.is_muted { "M" } else { "~" })
+                            .size(12)
+                            .color(text_color)
+                    )
+                    .on_press(Message::ToggleMute(fullscreen_vid.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
                     button(text("V").size(12).color(text_color))
                         .on_press(Message::ToggleFullscreen(fullscreen_vid.id))
                         .padding(8)
@@ -541,14 +544,12 @@ fn render_fullscreen_video<'a>(
         })
         .width(Length::Fill);
 
-        let overlay = container(
-            column![
-                top_bar,
-                // Center spacer (transparent)
-                container("").height(Length::Fill),
-                bottom_bar
-            ],
-        )
+        let overlay = container(column![
+            top_bar,
+            // Center spacer (transparent)
+            container("").height(Length::Fill),
+            bottom_bar
+        ])
         .width(Length::Fill)
         .height(Length::Fill);
 
@@ -601,11 +602,13 @@ fn render_fullscreen_photo<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Eleme
         .width(Length::Fill);
 
         let bottom_bar = container(
-            row![button(text("V").size(12).color(text_color))
-                .on_press(Message::ToggleFullscreen(photo.id))
-                .padding(8)
-                .width(Length::Shrink)
-                .height(Length::Shrink),]
+            row![
+                button(text("V").size(12).color(text_color))
+                    .on_press(Message::ToggleFullscreen(photo.id))
+                    .padding(8)
+                    .width(Length::Shrink)
+                    .height(Length::Shrink),
+            ]
             .spacing(5)
             .align_y(alignment::Vertical::Center)
             .padding(10),
@@ -616,14 +619,12 @@ fn render_fullscreen_photo<'a>(_app: &'a App, photo: &'a PhotoInstance) -> Eleme
         })
         .width(Length::Fill);
 
-        let overlay = container(
-            column![
-                top_bar,
-                // Center spacer (transparent)
-                container("").height(Length::Fill),
-                bottom_bar
-            ],
-        )
+        let overlay = container(column![
+            top_bar,
+            // Center spacer (transparent)
+            container("").height(Length::Fill),
+            bottom_bar
+        ])
         .width(Length::Fill)
         .height(Length::Fill);
 
