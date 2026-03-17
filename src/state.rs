@@ -20,18 +20,11 @@ pub struct VideoInstance {
     pub dragging: bool,
     pub was_paused_before_drag: bool,
     pub hovered: bool,
-    // Cached GStreamer state (NEVER query video.paused/looping/muted on main thread - use these!)
-    pub is_paused: bool,
-    pub is_looping: bool,
-    pub is_muted: bool,
     pub fullscreen: bool,
     pub _temp_dir: Option<TempDir>,
     pub native_fps: f64, // Native framerate of the video
     // UI fade tracking
     pub last_mouse_activity: Instant,
-    // Stall detection: tracks when position last *changed* value, not just when queried
-    pub last_position_update: Instant,
-    pub last_position_value: f64,
 }
 
 /// Represents a single photo instance in the player.
@@ -75,7 +68,6 @@ pub struct App {
     pub error: Option<String>,
     pub status: String,
     pub watchdog: crate::watchdog::Watchdog,
-    pub position_thread_rx: Option<mpsc::Receiver<crate::position_thread::PositionUpdate>>,
     pub stall_check_counter: u32,
     // Drag-to-reorder state
     pub drag_source_id: Option<usize>,
@@ -97,7 +89,6 @@ impl Default for App {
             error: None,
             status: "Drop media files here to load them".to_string(),
             watchdog: crate::watchdog::Watchdog::spawn(),
-            position_thread_rx: None,
             stall_check_counter: 0,
             drag_source_id: None,
             drag_target: None,

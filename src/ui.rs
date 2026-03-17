@@ -269,7 +269,7 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
             // Control buttons (use cached state to avoid blocking GStreamer queries)
             row![
                 button(
-                    text(if vid.is_paused { ">" } else { "||" })
+                    text(if vid.video.paused() { ">" } else { "||" })
                         .size(12)
                         .color(text_color)
                 )
@@ -278,7 +278,7 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
                 .width(Length::Shrink)
                 .height(Length::Shrink),
                 button(
-                    text(if vid.is_looping { "↻" } else { "→" })
+                    text(if vid.video.looping() { "↻" } else { "→" })
                         .size(12)
                         .color(text_color)
                 )
@@ -287,7 +287,7 @@ fn build_video_overlay<'a>(vid: &'a VideoInstance, opacity: f32) -> Element<'a, 
                 .width(Length::Shrink)
                 .height(Length::Shrink),
                 button(
-                    text(if vid.is_muted { "M" } else { "~" })
+                    text(if vid.video.muted() { "M" } else { "~" })
                         .size(12)
                         .color(text_color)
                 )
@@ -500,7 +500,7 @@ fn render_fullscreen_video<'a>(
                 // Control buttons (use cached state to avoid blocking GStreamer queries)
                 row![
                     button(
-                        text(if fullscreen_vid.is_paused { ">" } else { "||" })
+                        text(if fullscreen_vid.video.paused() { ">" } else { "||" })
                             .size(12)
                             .color(text_color)
                     )
@@ -509,7 +509,7 @@ fn render_fullscreen_video<'a>(
                     .width(Length::Shrink)
                     .height(Length::Shrink),
                     button(
-                        text(if fullscreen_vid.is_looping {
+                        text(if fullscreen_vid.video.looping() {
                             "↻"
                         } else {
                             "→"
@@ -522,7 +522,7 @@ fn render_fullscreen_video<'a>(
                     .width(Length::Shrink)
                     .height(Length::Shrink),
                     button(
-                        text(if fullscreen_vid.is_muted { "M" } else { "~" })
+                        text(if fullscreen_vid.video.muted() { "M" } else { "~" })
                             .size(12)
                             .color(text_color)
                     )

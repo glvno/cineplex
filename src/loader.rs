@@ -106,8 +106,6 @@ fn load_video_on_thread(video_path: &PathBuf, video_id: usize) -> LoadResult {
             1.0
         }
     };
-    let now = Instant::now();
-
     let video_instance = VideoInstance {
         id: video_id,
         video,
@@ -116,15 +114,10 @@ fn load_video_on_thread(video_path: &PathBuf, video_id: usize) -> LoadResult {
         dragging: false,
         was_paused_before_drag: false,
         hovered: false,
-        is_paused: false,
-        is_looping: true,
-        is_muted: true,
         fullscreen: false,
         _temp_dir: None,
         native_fps,
-        last_mouse_activity: now,
-        last_position_update: now,
-        last_position_value: 0.0,
+        last_mouse_activity: Instant::now(),
     };
 
     crate::gst_logger::log_video_created(video_id, &video_path.display().to_string());
@@ -214,9 +207,7 @@ fn create_video_from_pipeline(pipeline_str: &str) -> Result<Video, Box<dyn std::
     pipeline.set_property("mute", true);
     pipeline.set_property("volume", 0.0f64);
 
-    let mut video = Video::from_gst_pipeline(pipeline, video_sink, None)?;
-    video.set_muted(true);
-    video.set_volume(0.0);
+    let video = Video::from_gst_pipeline(pipeline, video_sink, None)?;
     video.set_looping(true);
 
     Ok(video)

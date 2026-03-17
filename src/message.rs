@@ -10,14 +10,13 @@ pub enum Message {
     SeekRelease(usize),
     EndOfStream(usize),
     ToggleMute(usize),
-    PositionTick,
     // Shared messages (work for both videos and photos)
     RemoveMedia(usize),
     MediaHoverChanged(usize, bool),
     MouseMoved(usize, iced::Point),
     DragStart(usize),
     ToggleFullscreen(usize),
-    // UI fade timer
+    // UI fade timer + position polling
     UiFadeTick,
     // Grid controls
     IncreaseColumns,

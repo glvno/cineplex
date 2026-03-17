@@ -8,7 +8,6 @@ use std::thread::ThreadId;
 
 /// Log categories for filtering
 enum LogCategory {
-    PositionQuery,
     Seek,
     Pause,
 }
@@ -16,53 +15,9 @@ enum LogCategory {
 impl LogCategory {
     fn as_str(&self) -> &'static str {
         match self {
-            LogCategory::PositionQuery => "POSITION_QUERY",
             LogCategory::Seek => "SEEK",
             LogCategory::Pause => "PAUSE",
         }
-    }
-}
-
-/// Log the start of a position query
-pub fn log_position_query_start(video_id: usize, thread_id: ThreadId) -> Instant {
-    log::trace!(
-        "[{}] Video {} position query START (thread: {:?})",
-        LogCategory::PositionQuery.as_str(),
-        video_id,
-        thread_id
-    );
-    Instant::now()
-}
-
-/// Log the completion of a position query with timing
-pub fn log_position_query_complete(video_id: usize, position: Duration, start: Instant) {
-    let elapsed = start.elapsed();
-    let elapsed_ms = elapsed.as_millis();
-
-    if elapsed_ms > 100 {
-        log::warn!(
-            "[{}] Video {} position query SLOW: {}ms, position={}s",
-            LogCategory::PositionQuery.as_str(),
-            video_id,
-            elapsed_ms,
-            position.as_secs_f64()
-        );
-    } else if elapsed_ms > 10 {
-        log::debug!(
-            "[{}] Video {} position query: {}ms, position={}s",
-            LogCategory::PositionQuery.as_str(),
-            video_id,
-            elapsed_ms,
-            position.as_secs_f64()
-        );
-    } else {
-        log::trace!(
-            "[{}] Video {} position query: {}ms, position={}s",
-            LogCategory::PositionQuery.as_str(),
-            video_id,
-            elapsed_ms,
-            position.as_secs_f64()
-        );
     }
 }
 

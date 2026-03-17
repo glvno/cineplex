@@ -2,8 +2,6 @@ mod app;
 mod gst_logger;
 mod loader;
 mod message;
-mod position_poller;
-mod position_thread;
 mod state;
 mod sync;
 mod ui;
