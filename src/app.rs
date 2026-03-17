@@ -232,42 +232,22 @@ impl App {
                         vid.duration = vid.position;
                     }
 
-                    // If looping is enabled, seek to start and force playing state.
-                    if vid.video.looping() {
-                        log::info!("Loop restart: video_id={}", id);
-                        let _ =
-                            synchronized_seek(id, &vid.video, Duration::from_secs(0), false);
-                        synchronized_set_paused(id, &vid.video, false);
-                    }
+                    // Loop restart is handled internally by iced_video_player's
+                    // VideoPlayer widget (restart_stream). No need to seek here;
+                    // a redundant flush-seek can stall the pipeline.
                 }
             }
             Message::UiFadeTick => {
-                // Update position from video's background worker thread (non-blocking)
+                // Update position and duration from video's background worker thread (non-blocking)
                 for item in &mut self.media {
                     if let MediaItem::Video(vid) = item {
                         if !vid.dragging {
-                            let pos = vid.video.cached_position().as_secs_f64();
+                            vid.position = vid.video.cached_position().as_secs_f64();
+                            let cached_dur = vid.video.cached_duration().as_secs_f64();
 
-                            // Only update if the displayed value changed meaningfully
-                            let old_display_pos = vid.position as u64;
-                            let new_display_pos = pos as u64;
-                            if old_display_pos != new_display_pos
-                                || (vid.position - pos).abs() > 1.0
-                            {
-                                vid.position = pos;
-                            }
-
-                            // If position exceeds cached duration, expand it
-                            if pos > vid.duration && pos.is_finite() {
-                                let old_duration = vid.duration;
-                                vid.duration = (pos * 1.1).max(vid.duration + 5.0);
-                                log::warn!(
-                                    "Duration correction: video_id={}, was={:.2}s, observed={:.2}s, now={:.2}s",
-                                    vid.id,
-                                    old_duration,
-                                    pos,
-                                    vid.duration
-                                );
+                            // Update duration from worker thread if it was re-queried
+                            if cached_dur > 0.0 && cached_dur.is_finite() {
+                                vid.duration = cached_dur;
                             }
                         }
                     }
