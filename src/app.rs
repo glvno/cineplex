@@ -395,7 +395,11 @@ impl App {
                 }
 
                 if self.loading_count > 0 {
-                    self.status = format!("Loading {} file{}...", self.loading_count, if self.loading_count == 1 { "" } else { "s" });
+                    self.status = format!(
+                        "Loading {} file{}...",
+                        self.loading_count,
+                        if self.loading_count == 1 { "" } else { "s" }
+                    );
                 } else if !self.media.is_empty() {
                     self.status = format!("{} media loaded", self.media.len());
                 }
@@ -416,15 +420,13 @@ impl App {
 
         // Tick for UI fade + position updates (100ms when videos or hovered media present)
         if has_videos || has_hovered_media {
-            subscriptions
-                .push(time::every(Duration::from_millis(100)).map(|_| Message::UiFadeTick));
+            subscriptions.push(time::every(Duration::from_millis(33)).map(|_| Message::UiFadeTick));
         }
 
         // Poll for loaded media results when background loads are in-flight
         if self.loading_count > 0 {
-            subscriptions.push(
-                time::every(Duration::from_millis(100)).map(|_| Message::CheckLoadedMedia),
-            );
+            subscriptions
+                .push(time::every(Duration::from_millis(100)).map(|_| Message::CheckLoadedMedia));
         }
 
         Subscription::batch(subscriptions)
